@@ -1,0 +1,158 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <script>
+    try {
+      if (localStorage.getItem("research-wall-theme") === "light") {
+        document.documentElement.setAttribute("data-theme", "light");
+      }
+    } catch (e) {}
+  </script>
+  <title>My research space</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link
+    href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,400;0,9..144,500;0,9..144,600;1,9..144,300;1,9..144,400&family=Inter:wght@300;400;500&family=Caveat:wght@400;500;600&display=swap"
+    rel="stylesheet"
+  />
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <!-- ============ WALL VIEW ============ -->
+  <main id="wall-view" class="view">
+    <header class="topbar">
+      <div class="topbar-main">
+        <div class="topbar-left">
+          <h1 class="brand">My research space</h1>
+          <p class="counter"><span id="note-count">0</span> NOTES PINNED</p>
+        </div>
+        <div class="topbar-right">
+          <div class="sort-row" role="group" aria-label="Sort the wall">
+            <span class="sort-label">SHOW ME:</span>
+            <button class="sort-tab active" data-sort="custom" type="button">Custom</button>
+            <button class="sort-tab" data-sort="newest" type="button">Newest</button>
+            <button class="sort-tab" data-sort="used" type="button">Most used</button>
+            <button class="sort-tab" data-sort="az" type="button">A-Z</button>
+            <button class="sort-tab" data-sort="random" type="button">Random</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="toolbar">
+        <div class="tag-tabs" id="tag-tabs" role="group" aria-label="Filter by tag"></div>
+        <div class="toolbar-actions">
+          <button class="pin-btn" id="pin-btn" type="button">+ pin a note</button>
+          <div class="progress-tabs" id="progress-tabs" role="group" aria-label="Filter by progress"></div>
+          <button class="trash-btn" id="trash-btn" type="button" aria-label="Open trash">
+            &#128465; trash <span class="trash-count" id="trash-count">0</span>
+          </button>
+          <input class="search" id="search-input" type="search" placeholder="search the wall..." aria-label="Search the wall" />
+          <button class="theme-btn" id="theme-btn" type="button" aria-label="Toggle light or dark background">
+            <span id="theme-icon">&#9790;</span> <span id="theme-label">dark</span>
+          </button>
+        </div>
+      </div>
+    </header>
+
+    <div class="trash-banner" id="trash-banner" hidden>
+      <p class="trash-banner-text">notes stay in the trash for 30 days, then they're permanently deleted.</p>
+      <button class="btn-back" id="back-to-wall" type="button">&larr; back to the wall</button>
+    </div>
+
+    <section class="wall" id="wall" aria-label="My research space"></section>
+
+    <p class="empty-state" id="empty-state" hidden>nothing pinned here yet — pin a note to get started.</p>
+    <p class="empty-state" id="trash-empty-state" hidden>the trash is empty.</p>
+  </main>
+
+  <!-- ============ ADD NOTE MODAL ============ -->
+  <div id="add-modal" class="modal" hidden>
+    <div class="modal-scrim" data-close-modal></div>
+    <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="add-note-title">
+      <button class="modal-close" type="button" data-close-modal aria-label="close">&#10005;</button>
+
+      <h2 id="add-note-title" class="modal-title">pin a note</h2>
+      <p class="modal-sub">(one idea per note)</p>
+
+      <!-- live preview -->
+      <div class="preview-wrap">
+        <div class="note preview-note" id="preview-note">
+          <div class="note-tags" id="preview-tags"></div>
+          <span class="note-text" id="preview-text">a question worth chasing...</span>
+          <span class="note-source" id="preview-source"></span>
+          <span class="note-progress" id="preview-progress"></span>
+        </div>
+      </div>
+
+      <fieldset class="option-group">
+        <legend>PAPER</legend>
+        <div class="paper-colors" id="paper-colors"></div>
+        <div class="paper-styles" id="paper-styles"></div>
+      </fieldset>
+
+      <fieldset class="option-group">
+        <legend>SIZE</legend>
+        <div class="size-picker" id="size-picker"></div>
+      </fieldset>
+
+      <fieldset class="option-group">
+        <legend>TAGS</legend>
+        <div class="tag-picker" id="tag-picker"></div>
+        <div class="new-tag-row">
+          <input id="new-tag-input" class="new-tag-input" type="text" maxlength="30" placeholder="new tag (e.g. grant apps)..." aria-label="New tag name" />
+          <button id="new-tag-btn" class="new-tag-btn" type="button">add</button>
+        </div>
+      </fieldset>
+
+      <fieldset class="option-group">
+        <legend>PROGRESS</legend>
+        <div class="progress-picker" id="progress-picker"></div>
+      </fieldset>
+
+      <label class="field-label" for="note-input">YOUR NOTE</label>
+      <textarea
+        id="note-input"
+        class="note-input"
+        rows="3"
+        maxlength="200"
+        placeholder="a thought, a question, a to-do..."
+      ></textarea>
+      <div class="char-count" id="char-count">0/200</div>
+
+      <label class="field-label" for="source-input">SOURCE / LINK <span class="opt">(optional)</span></label>
+      <input
+        id="source-input"
+        class="name-input"
+        type="text"
+        maxlength="200"
+        placeholder="a paper, DOI, url, or where you got this..."
+      />
+
+      <button id="submit-btn" class="btn-submit" type="button">Pin</button>
+    </div>
+  </div>
+
+  <!-- ============ NOTE DETAIL POPUP ============ -->
+  <div id="note-popup" class="modal" hidden>
+    <div class="modal-scrim" data-close-popup></div>
+    <div class="note-detail" role="dialog" aria-modal="true">
+      <button class="modal-close" type="button" data-close-popup aria-label="close">&#10005;</button>
+      <div class="note detail-note" id="detail-note">
+        <div class="note-tags" id="detail-tags"></div>
+        <p class="note-text" id="detail-text"></p>
+        <a class="note-source" id="detail-source" target="_blank" rel="noopener"></a>
+        <span class="note-progress" id="detail-progress"></span>
+      </div>
+      <div class="detail-actions">
+        <button id="progress-btn" class="progress-btn" type="button"></button>
+        <span class="view-count" id="view-count">opened 0 times</span>
+        <button id="trash-note-btn" class="btn-text" type="button">&#128465; move to trash</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
