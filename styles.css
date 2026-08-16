@@ -130,8 +130,9 @@ body {
 
 .sort-row {
   display: flex;
+  flex-wrap: wrap;
   align-items: baseline;
-  gap: 16px;
+  gap: 8px 16px;
   font-family: var(--sans);
   font-size: 0.72rem;
 }

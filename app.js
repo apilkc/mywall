@@ -211,8 +211,78 @@ function sortList(list) {
   } else if (sortMode === "az") {
     list.sort((a, b) => a.text.localeCompare(b.text));
   }
-  // "custom" and "random" keep the current order — positions are what matter
+  // "custom", "clean", "bytag", and "random" keep the current order — positions are what matter
   return list;
+}
+
+// arrange notes into tag blocks: notes sharing a tag stay together in one block
+function layoutByTag(list) {
+  const board = document.querySelector("#wall");
+  const maxRight = Math.max(760, (board ? board.clientWidth : window.innerWidth)) - BOARD_PAD;
+  const cols = Math.max(2, Math.floor((maxRight - BOARD_PAD + GAP) / (NOTE_W + GAP)));
+  const occupied = {};
+  const place = (row, col, w, h) => {
+    for (let r = row; r < row + h; r++) {
+      if (!occupied[r]) occupied[r] = {};
+      for (let c = col; c < col + w; c++) occupied[r][c] = true;
+    }
+  };
+  const canPlace = (row, col, w, h) => {
+    for (let r = row; r < row + h; r++) {
+      if (occupied[r]) {
+        for (let c = col; c < col + w; c++) if (occupied[r][c]) return false;
+      }
+    }
+    return true;
+  };
+  const blockRow = (row) => {
+    if (!occupied[row]) occupied[row] = {};
+    for (let c = 0; c < cols; c++) occupied[row][c] = true;
+  };
+
+  // groups in tag-tab order; untagged notes last
+  const order = tags.map((t) => t.id);
+  const groups = Array.from({ length: order.length + 1 }, () => []);
+  list.forEach((n) => {
+    // find the first of this note's tags that exists in the tag order, then use its
+    // position IN the order as the group index (not its index within n.tags)
+    let gi = order.length;
+    for (const id of n.tags || []) {
+      const idx = order.indexOf(id);
+      if (idx >= 0) {
+        gi = idx;
+        break;
+      }
+    }
+    groups[gi].push(n);
+  });
+
+  let startRow = 0;
+  groups.forEach((grp) => {
+    if (!grp.length) return;
+    if (startRow > 0) {
+      blockRow(startRow); // blank row between tag blocks
+      startRow += 1;
+    }
+    let lastRow = startRow;
+    grp.sort((a, b) => (b.date || 0) - (a.date || 0));
+    grp.forEach((n) => {
+      const w = isLarge(n) ? 2 : 1;
+      const h = isLarge(n) ? 2 : 1;
+      outer: for (let row = startRow; row < 2000; row++) {
+        for (let col = 0; col + w <= cols; col++) {
+          if (canPlace(row, col, w, h)) {
+            n.x = BOARD_PAD + col * (NOTE_W + GAP);
+            n.y = BOARD_PAD + row * (NOTE_H + GAP);
+            place(row, col, w, h);
+            lastRow = Math.max(lastRow, row + h - 1);
+            break outer;
+          }
+        }
+      }
+    });
+    startRow = lastRow + 1;
+  });
 }
 
 // snap notes into a solid block: every cell filled, large notes take an exact 2x2 slot
@@ -1202,6 +1272,8 @@ document.querySelectorAll(".sort-tab").forEach((tab) => {
     const list = notes.filter((n) => !isTrashed(n));
     if (sortMode === "custom") restoreCustom(list);
     else if (sortMode === "random") scatterNotes(list);
+    else if (sortMode === "bytag") layoutByTag(list);
+    else if (sortMode === "clean") layoutNotes(list);
     else layoutNotes(sortList(list));
     saveNotes();
     render();
