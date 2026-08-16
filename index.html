@@ -116,10 +116,10 @@
         id="note-input"
         class="note-input"
         rows="3"
-        maxlength="200"
+        maxlength="150"
         placeholder="a thought, a question, a to-do..."
       ></textarea>
-      <div class="char-count" id="char-count">0/200</div>
+      <div class="char-count" id="char-count">0/150</div>
 
       <label class="field-label" for="source-input">SOURCE / LINK <span class="opt">(optional)</span></label>
       <input
@@ -146,6 +146,7 @@
         <span class="note-progress" id="detail-progress"></span>
       </div>
       <div class="detail-actions">
+        <button id="edit-btn" class="progress-btn" type="button">&#9998; edit</button>
         <button id="progress-btn" class="progress-btn" type="button"></button>
         <span class="view-count" id="view-count">opened 0 times</span>
         <button id="trash-note-btn" class="btn-text" type="button">&#128465; move to trash</button>

@@ -89,6 +89,10 @@ body {
 /* ---------- header ---------- */
 
 .topbar {
+  position: sticky;
+  top: 0;
+  z-index: 40;
+  background: var(--wall);
   padding-bottom: 22px;
   border-bottom: 1px solid var(--line);
 }
@@ -429,16 +433,18 @@ body {
 .wall > .note {
   position: absolute;
   width: 232px;
+  height: 250px;
   top: 0;
   left: 0;
   cursor: grab;
   touch-action: none;
   user-select: none;
   -webkit-user-select: none;
+  overflow: hidden;
 }
 
 .wall > .note.dragging {
-  z-index: 20;
+  z-index: 60;
   cursor: grabbing;
   transition: none;
   box-shadow: 0 26px 48px rgba(0, 0, 0, 0.6);
@@ -509,13 +515,15 @@ body.is-dragging { cursor: grabbing; }
 
 .note-text {
   font-family: var(--hand);
-  font-size: clamp(1.15rem, 1rem + 0.45vw, 1.4rem);
+  font-size: clamp(1rem, 0.85rem + 0.35vw, 1.15rem);
   font-weight: 500;
   line-height: 1.2;
   color: var(--ink);
   margin: 0;
   overflow-wrap: break-word;
   flex: 1;
+  min-height: 0;
+  overflow: hidden;
 }
 
 .note-source {
@@ -632,7 +640,7 @@ body.is-dragging { cursor: grabbing; }
 
 .preview-note {
   width: 220px;
-  min-height: 200px;
+  min-height: 240px;
   padding: 20px 22px 16px;
   cursor: default;
   animation: none;
@@ -998,16 +1006,16 @@ body.is-dragging { cursor: grabbing; }
 
 .note.size-large { min-height: 400px; }
 
-.wall > .note.size-large { width: 472px; }
+.wall > .note.size-large { width: 484px; height: 520px; }
 
 .note.size-large .note-text {
-  font-size: clamp(1.5rem, 1.2rem + 1vw, 1.9rem);
+  font-size: clamp(1.3rem, 1.05rem + 0.7vw, 1.55rem);
 }
 
-.preview-note.size-large { width: 380px; min-height: 360px; }
+.preview-note.size-large { width: 440px; min-height: 480px; }
 .preview-note.size-large .note-text { font-size: 1.7rem; }
 
-.detail-note.size-large { width: min(560px, 88vw); min-height: 420px; }
+.detail-note.size-large { width: min(560px, 88vw); min-height: 480px; }
 .detail-note.size-large .note-text { font-size: 2rem; }
 
 .size-picker {
@@ -1035,13 +1043,46 @@ body.is-dragging { cursor: grabbing; }
 
 .size-pick.selected { border-color: var(--cream); color: var(--cream); }
 
+/* ---------- drag-drop targets ---------- */
+
+.tag-tab.drop-hover,
+.trash-btn.drop-hover {
+  color: var(--cream);
+  border-color: var(--cream);
+  background: rgba(224, 138, 122, 0.22);
+}
+
+.trash-btn.drop-hover {
+  color: #e08a7a;
+  border-color: #e08a7a;
+}
+
+/* ---------- toast ---------- */
+
+.toast {
+  position: fixed;
+  left: 50%;
+  bottom: 28px;
+  transform: translateX(-50%);
+  background: var(--surface);
+  border: 1px solid var(--line-strong);
+  color: var(--cream);
+  font-family: var(--serif);
+  font-size: 0.95rem;
+  padding: 12px 24px;
+  border-radius: 999px;
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.5);
+  z-index: 200;
+  animation: pop-in 0.3s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+
 /* ---------- responsive ---------- */
 
 @media (max-width: 620px) {
   .topbar-main { flex-direction: column; }
   .topbar-right { align-items: flex-start; }
-  .wall > .note { width: 200px; }
-  .wall > .note.size-large { width: 200px; min-height: 340px; }
+  .wall > .note { width: 200px; height: 220px; }
+  .wall > .note.size-large { width: 200px; height: 260px; }
   .note { min-height: 170px; padding: 16px 16px 14px; }
   .note-text { font-size: 1.1rem; }
   .tag-picker,

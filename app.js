@@ -51,14 +51,16 @@ const NOTE_SIZES = [
   { id: "large", label: "large (2\u00d7)" },
 ];
 
+const NOTE_MAX_CHARS = { normal: 150, large: 300 };
+const MAX_TAGS = 2;
+
 // board layout constants (used for initial placement + "arrange" sorts)
-const BOARD_COLS = 4;
-const BOARD_CELL_W = 250;
-const BOARD_CELL_H = 270;
 const BOARD_PAD = 20;
+const GAP = 20;
 const NOTE_W = 232;
-const NOTE_W_LARGE = 472;
-const NOTE_MIN_H_LARGE = 400;
+const NOTE_H = 250;
+const NOTE_W_LARGE = 484; // 2 * NOTE_W + GAP
+const NOTE_H_LARGE = 520; // 2 * NOTE_H + GAP
 
 const SEED_NOTES = [
   { text: "define the research question in one sentence before touching the data.", tags: ["research"], progress: "done", source: "", views: 24, date: 15 },
@@ -96,6 +98,7 @@ let selectedColor = "cream";
 let selectedStyle = "blank";
 let selectedSize = "normal";
 let openNoteId = null;
+let editingNoteId = null;
 let viewMode = "wall"; // "wall" | "trash"
 
 /* ---------- elements ---------- */
@@ -181,6 +184,23 @@ function noteWidth(note) {
   return isLarge(note) ? NOTE_W_LARGE : NOTE_W;
 }
 
+let toastTimer = null;
+
+function showToast(msg) {
+  const old = document.querySelector(".toast");
+  if (old) old.remove();
+  const t = document.createElement("div");
+  t.className = "toast";
+  t.textContent = msg;
+  document.body.appendChild(t);
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => t.remove(), 2600);
+}
+
+function pointInRect(x, y, r) {
+  return x >= r.left && x <= r.right && y >= r.top && y <= r.bottom;
+}
+
 /* ---------- board layout ---------- */
 
 function sortList(list) {
@@ -195,25 +215,42 @@ function sortList(list) {
   return list;
 }
 
-// snap a list of notes into a tidy straight grid (large notes take a 2x2 cell)
+// snap notes into a solid block: every cell filled, large notes take an exact 2x2 slot
 function layoutNotes(list) {
   const board = document.querySelector("#wall");
-  const boardW = Math.max(700, (board ? board.clientWidth : window.innerWidth) - BOARD_PAD * 2);
-  let x = BOARD_PAD;
-  let y = BOARD_PAD;
-  let rowH = 0;
-  list.forEach((n) => {
-    const w = isLarge(n) ? BOARD_CELL_W * 2 : BOARD_CELL_W;
-    const h = isLarge(n) ? BOARD_CELL_H * 2 : BOARD_CELL_H;
-    if (x + w > boardW + BOARD_PAD) {
-      x = BOARD_PAD;
-      y += rowH;
-      rowH = 0;
+  const maxRight = Math.max(760, (board ? board.clientWidth : window.innerWidth)) - BOARD_PAD;
+  const cols = Math.max(2, Math.floor((maxRight - BOARD_PAD + GAP) / (NOTE_W + GAP)));
+  const occupied = {};
+  const place = (row, col, w, h) => {
+    for (let r = row; r < row + h; r++) {
+      if (!occupied[r]) occupied[r] = {};
+      for (let c = col; c < col + w; c++) occupied[r][c] = true;
     }
-    n.x = x;
-    n.y = y;
-    x += w;
-    rowH = Math.max(rowH, h);
+  };
+  const canPlace = (row, col, w, h) => {
+    for (let r = row; r < row + h; r++) {
+      if (occupied[r]) {
+        for (let c = col; c < col + w; c++) {
+          if (occupied[r][c]) return false;
+        }
+      }
+    }
+    return true;
+  };
+
+  list.forEach((n) => {
+    const w = isLarge(n) ? 2 : 1;
+    const h = isLarge(n) ? 2 : 1;
+    for (let row = 0; row < 500; row++) {
+      for (let col = 0; col + w <= cols; col++) {
+        if (canPlace(row, col, w, h)) {
+          n.x = BOARD_PAD + col * (NOTE_W + GAP);
+          n.y = BOARD_PAD + row * (NOTE_H + GAP);
+          place(row, col, w, h);
+          return;
+        }
+      }
+    }
   });
 }
 
@@ -222,10 +259,11 @@ function scatterNotes(list) {
   const board = document.querySelector("#wall");
   const boardW = Math.max(700, (board ? board.clientWidth : window.innerWidth) - 16);
   const highest = list.length ? Math.max(...list.map((n) => n.y || 0)) : 0;
-  const height = Math.max(820, highest + 700);
+  const height = Math.max(900, highest + 760);
   list.forEach((n) => {
+    const h = isLarge(n) ? NOTE_H_LARGE : NOTE_H;
     n.x = Math.round(16 + Math.random() * Math.max(0, boardW - noteWidth(n) - 16));
-    n.y = Math.round(16 + Math.random() * Math.max(0, height - NOTE_MIN_H_LARGE - 16));
+    n.y = Math.round(16 + Math.random() * Math.max(0, height - h - 16));
   });
 }
 
@@ -253,7 +291,7 @@ function defaultNotePosition(size) {
 function updateBoardSize() {
   let h = 900;
   notes.forEach((n) => {
-    if (typeof n.y === "number") h = Math.max(h, n.y + (isLarge(n) ? 460 : 300));
+    if (typeof n.y === "number") h = Math.max(h, n.y + (isLarge(n) ? NOTE_H_LARGE : NOTE_H) + 60);
   });
   wallEl.style.minHeight = h + "px";
 }
@@ -432,6 +470,33 @@ function enableDrag(el, note) {
   let origY = 0;
   let moved = false;
   let dragging = false;
+  let hoverKey = null;
+
+  const dropTargetAt = (cx, cy) => {
+    if (viewMode === "trash") return null;
+    const trash = document.getElementById("trash-btn");
+    if (trash && pointInRect(cx, cy, trash.getBoundingClientRect())) return { type: "trash" };
+    for (const t of document.querySelectorAll(".tag-tab[data-tag]")) {
+      const id = t.dataset.tag;
+      if (id === "all") continue;
+      if (pointInRect(cx, cy, t.getBoundingClientRect())) return { type: "tag", id };
+    }
+    return null;
+  };
+
+  const keyFor = (t) => (t ? t.type + ":" + (t.id || "") : null);
+
+  const applyHover = (key) => {
+    document.querySelectorAll(".drop-hover").forEach((x) => x.classList.remove("drop-hover"));
+    if (!key) return;
+    if (key.startsWith("tag:")) {
+      const t = document.querySelector('.tag-tab[data-tag="' + key.slice(4) + '"]');
+      if (t) t.classList.add("drop-hover");
+    } else if (key === "trash:") {
+      const t = document.getElementById("trash-btn");
+      if (t) t.classList.add("drop-hover");
+    }
+  };
 
   el.addEventListener("pointerdown", (e) => {
     if (viewMode === "trash") return;
@@ -439,6 +504,7 @@ function enableDrag(el, note) {
     if (e.button !== 0) return;
     dragging = true;
     moved = false;
+    hoverKey = null;
     startX = e.clientX;
     startY = e.clientY;
     origX = note.x || 0;
@@ -464,6 +530,12 @@ function enableDrag(el, note) {
     note.y = Math.max(0, origY + dy);
     el.style.left = note.x + "px";
     el.style.top = note.y + "px";
+
+    const key = keyFor(dropTargetAt(e.clientX, e.clientY));
+    if (key !== hoverKey) {
+      hoverKey = key;
+      applyHover(key);
+    }
   });
 
   const end = (e) => {
@@ -476,7 +548,27 @@ function enableDrag(el, note) {
     } catch {
       /* ignore */
     }
-    if (moved) {
+    applyHover(null);
+    hoverKey = null;
+
+    const target = dropTargetAt(e.clientX, e.clientY);
+
+    if (moved && target) {
+      // snap the note back to its spot, then apply the drop action
+      note.x = origX;
+      note.y = origY;
+      el.style.left = origX + "px";
+      el.style.top = origY + "px";
+      if (target.type === "trash") {
+        trashNote(note.id);
+        showToast("moved to trash");
+      } else if (target.type === "tag") {
+        const added = addTagToNote(note.id, target.id);
+        saveNotes();
+        render();
+        if (added) showToast("tag added");
+      }
+    } else if (moved) {
       note.cx = note.x;
       note.cy = note.y;
       saveNotes();
@@ -710,8 +802,14 @@ function buildTagPicker() {
     b.append(dot, label);
     b.addEventListener("click", () => {
       const i = selectedTags.indexOf(t.id);
-      if (i >= 0) selectedTags.splice(i, 1);
-      else selectedTags.push(t.id);
+      if (i >= 0) {
+        selectedTags.splice(i, 1);
+      } else if (selectedTags.length >= MAX_TAGS) {
+        showToast("max " + MAX_TAGS + " tags per note");
+        return;
+      } else {
+        selectedTags.push(t.id);
+      }
       buildTagPicker();
       updatePreview();
     });
@@ -763,7 +861,10 @@ function buildSizePicker() {
     b.textContent = s.label;
     b.addEventListener("click", () => {
       selectedSize = s.id;
+      noteInput.maxLength = NOTE_MAX_CHARS[s.id];
+      if (noteInput.value.length > noteInput.maxLength) noteInput.value = noteInput.value.slice(0, noteInput.maxLength);
       buildSizePicker();
+      updateCharCount();
       updatePreview();
     });
     picker.appendChild(b);
@@ -786,11 +887,15 @@ function updatePreview() {
 }
 
 function openAddModal() {
+  editingNoteId = null;
+  $("#add-note-title").textContent = "pin a note";
+  $("#submit-btn").textContent = "Pin";
   selectedTags = [];
   selectedProgress = "todo";
   selectedColor = "cream";
   selectedStyle = "blank";
   selectedSize = "normal";
+  noteInput.maxLength = NOTE_MAX_CHARS.normal;
   noteInput.value = "";
   sourceInput.value = "";
   $("#new-tag-input").value = "";
@@ -807,6 +912,33 @@ function openAddModal() {
 
 function closeAddModal() {
   addModal.hidden = true;
+  editingNoteId = null;
+}
+
+function openEditModal(id) {
+  const note = findNote(id);
+  if (!note || isTrashed(note)) return;
+  closePopup();
+  editingNoteId = id;
+  selectedTags = (note.tags || []).filter((t) => tags.some((x) => x.id === t));
+  selectedProgress = note.progress;
+  selectedColor = note.color;
+  selectedStyle = note.style;
+  selectedSize = note.size || "normal";
+  noteInput.value = note.text;
+  sourceInput.value = note.source || "";
+  noteInput.maxLength = NOTE_MAX_CHARS[selectedSize];
+  $("#new-tag-input").value = "";
+  $("#add-note-title").textContent = "edit note";
+  $("#submit-btn").textContent = "Save";
+  updateCharCount();
+  buildPaperControls();
+  buildSizePicker();
+  buildTagPicker();
+  buildProgressPicker();
+  updatePreview();
+  addModal.hidden = false;
+  setTimeout(() => noteInput.focus(), 60);
 }
 
 function addNewTag() {
@@ -816,7 +948,10 @@ function addNewTag() {
   const tag = { id: makeId(), label, color: TAG_PALETTE[tags.length % TAG_PALETTE.length] };
   tags.push(tag);
   saveTags();
-  if (!selectedTags.includes(tag.id)) selectedTags.push(tag.id);
+  if (!selectedTags.includes(tag.id)) {
+    if (selectedTags.length >= MAX_TAGS) showToast("max " + MAX_TAGS + " tags per note");
+    else selectedTags.push(tag.id);
+  }
   input.value = "";
   buildTagPicker();
   buildTagTabs();
@@ -831,6 +966,24 @@ function submitNote() {
     noteInput.focus();
     noteInput.style.borderColor = "rgba(224, 138, 122, 0.7)";
     setTimeout(() => (noteInput.style.borderColor = ""), 900);
+    return;
+  }
+
+  if (editingNoteId) {
+    const note = findNote(editingNoteId);
+    if (note) {
+      note.text = text;
+      note.tags = selectedTags.slice();
+      note.progress = selectedProgress;
+      note.color = selectedColor;
+      note.style = selectedStyle;
+      note.size = selectedSize;
+      note.source = sourceInput.value.trim();
+      note.touchedAt = Date.now();
+      saveNotes();
+    }
+    closeAddModal();
+    render();
     return;
   }
 
@@ -915,6 +1068,21 @@ function cycleProgress() {
 
 /* ---------- trash actions ---------- */
 
+function addTagToNote(id, tagId) {
+  const note = findNote(id);
+  if (!note) return false;
+  if (!Array.isArray(note.tags)) note.tags = [];
+  if (note.tags.includes(tagId)) return false;
+  if (note.tags.length >= MAX_TAGS) {
+    showToast("max " + MAX_TAGS + " tags per note");
+    return false;
+  }
+  note.tags.push(tagId);
+  note.touchedAt = Date.now();
+  saveNotes();
+  return true;
+}
+
 function trashNote(id) {
   const note = findNote(id);
   if (!note) return;
@@ -990,7 +1158,7 @@ noteInput.addEventListener("keydown", (e) => {
 });
 
 function updateCharCount() {
-  charCount.textContent = `${noteInput.value.length}/200`;
+  charCount.textContent = `${noteInput.value.length}/${noteInput.maxLength}`;
 }
 
 const newTagInput = $("#new-tag-input");
@@ -1045,6 +1213,14 @@ $("#trash-note-btn").addEventListener("click", () => {
 });
 
 $("#progress-btn").addEventListener("click", cycleProgress);
+
+$("#edit-btn").addEventListener("click", () => {
+  if (openNoteId) openEditModal(openNoteId);
+});
+
+$("#detail-note").addEventListener("dblclick", () => {
+  if (openNoteId) openEditModal(openNoteId);
+});
 
 document.addEventListener("keydown", (e) => {
   if (e.key !== "Escape") return;
