@@ -1323,7 +1323,7 @@ document.querySelectorAll(".sort-tab").forEach((tab) => {
     if (sortMode === "custom") restoreCustom(list);
     else if (sortMode === "random") scatterNotes(list);
     else if (sortMode === "bytag") layoutByTag(list);
-    else if (sortMode === "clean") layoutNotes(list);
+    else if (sortMode === "clean") { list.sort((a, b) => (b.date || 0) - (a.date || 0)); layoutNotes(list); }
     else layoutNotes(sortList(list));
     saveNotes();
     render();
