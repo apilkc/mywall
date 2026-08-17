@@ -1103,25 +1103,28 @@ body.is-dragging { cursor: grabbing; }
 
 .matrix-view {
   position: relative;
-  margin: 32px auto 0;
-  max-width: 900px;
-  padding: 40px 0 40px 40px;
+  margin: 28px auto 0;
+  max-width: none;
+  width: 100%;
+  padding: 46px 0 56px 52px;
 }
 
 .matrix-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
   grid-template-rows: 1fr 1fr;
-  gap: 3px;
-  background: var(--line);
-  border-radius: 14px;
+  gap: 2px;
+  background: var(--line-strong);
+  border: 2px solid var(--line-strong);
+  border-radius: 16px;
   overflow: hidden;
-  min-height: 520px;
+  height: calc(100vh - 420px);
+  min-height: 440px;
 }
 
 .matrix-cell {
   background: var(--surface);
-  padding: 18px 16px 14px;
+  padding: 22px 22px 18px;
   min-height: 240px;
   display: flex;
   flex-direction: column;
@@ -1135,7 +1138,7 @@ body.is-dragging { cursor: grabbing; }
 .matrix-label {
   margin: 0 0 2px;
   font-family: var(--sans);
-  font-size: 0.82rem;
+  font-size: 1rem;
   font-weight: 700;
   letter-spacing: 0.02em;
   color: var(--cream);
@@ -1145,17 +1148,17 @@ body.is-dragging { cursor: grabbing; }
 }
 
 .mq-dot {
-  width: 10px;
-  height: 10px;
+  width: 12px;
+  height: 12px;
   border-radius: 50%;
   flex: none;
   display: inline-block;
 }
 
 .mq-hint {
-  margin: 0 0 12px;
+  margin: 0 0 14px;
   font-family: var(--sans);
-  font-size: 0.62rem;
+  font-size: 0.7rem;
   color: var(--gray);
   letter-spacing: 0.04em;
 }
@@ -1164,8 +1167,9 @@ body.is-dragging { cursor: grabbing; }
   flex: 1;
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 10px;
   overflow-y: auto;
+  padding-right: 4px;
 }
 
 /* matrix note cards — compact, non-draggable on the board */
@@ -1173,8 +1177,8 @@ body.is-dragging { cursor: grabbing; }
   --paper: var(--paper);
   background-color: var(--paper);
   color: var(--ink);
-  padding: 10px 12px 9px;
-  border-radius: 3px;
+  padding: 12px 14px 11px;
+  border-radius: 4px;
   font-family: var(--sans);
   cursor: grab;
   touch-action: none;
@@ -1197,7 +1201,7 @@ body.is-dragging { cursor: grabbing; }
 }
 
 .matrix-note .note-text {
-  font-size: 0.78rem;
+  font-size: 0.9rem;
   font-weight: 500;
   line-height: 1.3;
   margin: 0;
@@ -1210,50 +1214,51 @@ body.is-dragging { cursor: grabbing; }
 .matrix-note .note-tags {
   display: flex;
   gap: 4px;
-  margin-bottom: 6px;
+  margin-bottom: 7px;
 }
 
 .matrix-note .note-tag {
-  font-size: 0.5rem;
-  padding: 2px 6px;
+  font-size: 0.56rem;
+  padding: 2px 7px;
 }
 
 .matrix-note .note-tag .dot {
+  width: 7px;
+  height: 7px;
+}
+
+.matrix-note .note-progress {
+  margin-top: 9px;
+  font-size: 0.56rem;
+  padding: 2px 7px;
+}
+
+.matrix-note .note-progress .dot {
   width: 6px;
   height: 6px;
 }
 
-.matrix-note .note-progress {
-  margin-top: 8px;
-  font-size: 0.5rem;
-  padding: 2px 6px;
-}
-
-.matrix-note .note-progress .dot {
-  width: 5px;
-  height: 5px;
-}
-
-/* axis labels */
+/* axis labels — big, clear, reading along the graph axes */
 .matrix-axis-label {
   position: absolute;
   font-family: var(--sans);
-  font-size: 0.68rem;
+  font-size: 1.05rem;
   font-weight: 700;
-  letter-spacing: 0.14em;
-  color: var(--gray);
+  letter-spacing: 0.22em;
+  color: var(--cream);
   text-transform: uppercase;
+  opacity: 0.9;
 }
 
 .matrix-axis-y {
-  left: 8px;
+  left: 4px;
   top: 50%;
   transform: translateY(-50%) rotate(-90deg);
   transform-origin: center;
 }
 
 .matrix-axis-x {
-  bottom: 8px;
+  bottom: 6px;
   left: 50%;
   transform: translateX(-50%);
 }
@@ -1261,6 +1266,9 @@ body.is-dragging { cursor: grabbing; }
 /* ---------- responsive ---------- */
 
 @media (max-width: 620px) {
+  .matrix-view { padding: 40px 0 48px 40px; }
+  .matrix-grid { min-height: 520px; }
+  .matrix-axis-label { font-size: 0.85rem; }
   .topbar-main { flex-direction: column; }
   .topbar-right { align-items: flex-start; }
   .wall > .note { width: 200px; height: 220px; }
