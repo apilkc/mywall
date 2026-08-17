@@ -360,9 +360,12 @@ function restoreCustom(list) {
 }
 
 // render notes inside the Eisenhower / Action Priority matrix
+// each quadrant is an open graph area; notes float freely inside it
 function layoutMatrix(list) {
   const grid = document.getElementById("matrix-view");
   if (!grid) return;
+
+  let needsSave = false;
 
   MATRIX_QUADS.forEach((q) => {
     const cell = document.getElementById("mq-" + q);
@@ -370,9 +373,10 @@ function layoutMatrix(list) {
     const notesWrap = cell.querySelector(".mq-notes");
     notesWrap.innerHTML = "";
 
-    list.filter((n) => matrixQuadrant(n) === q).forEach((note) => {
+    list.filter((n) => matrixQuadrant(n) === q).forEach((note, i) => {
       const card = document.createElement("div");
       card.className = "matrix-note";
+      if (note.size === "large") card.classList.add("size-large");
       card.setAttribute("data-note-id", note.id);
       setPaper(card, paperColorFor(note), note.style);
 
@@ -390,22 +394,39 @@ function layoutMatrix(list) {
       const badge = makeProgressBadge(note.progress);
 
       card.append(tagsRow, txt, badge);
-
-      // drag between quadrants
-      enableMatrixDrag(card, note);
-
-      // click to open detail
-      card.addEventListener("click", () => openNote(note.id));
-
       notesWrap.appendChild(card);
+
+      // first time: scatter it in the quadrant (stable two-column flow)
+      if (typeof note.mqX !== "number" || typeof note.mqY !== "number") {
+        const col = i % 2;
+        const row = Math.floor(i / 2);
+        note.mqX = 4 + col * 46 + ((i * 7) % 5);
+        note.mqY = 5 + row * 27 + ((i * 11) % 6);
+        needsSave = true;
+      }
+
+      // place relative to the room the note can actually use
+      const cw = notesWrap.clientWidth || cell.clientWidth;
+      const ch = notesWrap.clientHeight || cell.clientHeight;
+      const nw = card.offsetWidth;
+      const nh = card.offsetHeight;
+      const maxX = Math.max(0, cw - nw);
+      const maxY = Math.max(0, ch - nh);
+      card.style.left = Math.round((note.mqX / 100) * maxX) + "px";
+      card.style.top = Math.round((note.mqY / 100) * maxY) + "px";
+
+      // drag freely inside the quadrant, drop into another to move it
+      enableMatrixDrag(card, note);
     });
   });
+
+  if (needsSave) saveNotes();
 }
 
 function enableMatrixDrag(el, note) {
   let startX = 0, startY = 0, moved = false, dragging = false;
-  let origX, origY;
-  let hoverCell = null;
+  let startLeft = 0, startTop = 0;
+  let startCell = null, hoverCell = null;
 
   el.addEventListener("pointerdown", (e) => {
     if (e.button !== 0) return;
@@ -413,8 +434,11 @@ function enableMatrixDrag(el, note) {
     moved = false;
     startX = e.clientX;
     startY = e.clientY;
-    origX = note.x;
-    origY = note.y;
+    startCell = el.closest(".matrix-cell");
+    const crect = startCell ? startCell.getBoundingClientRect() : null;
+    const er = el.getBoundingClientRect();
+    startLeft = crect ? er.left - crect.left : 0;
+    startTop = crect ? er.top - crect.top : 0;
     try { el.setPointerCapture(e.pointerId); } catch {}
     el.classList.add("dragging");
     document.body.classList.add("is-dragging");
@@ -427,11 +451,22 @@ function enableMatrixDrag(el, note) {
     if (!moved && Math.abs(dx) + Math.abs(dy) > 4) moved = true;
     if (!moved) return;
 
-    // find which cell we're over
     document.querySelectorAll(".matrix-cell").forEach((c) => c.classList.remove("mq-drop-active"));
     const cell = cellAtPoint(e.clientX, e.clientY);
-    if (cell) cell.classList.add("mq-drop-active");
-    hoverCell = cell;
+    if (cell) {
+      cell.classList.add("mq-drop-active");
+      hoverCell = cell;
+      // move the note into the hovered quadrant so it floats over it
+      if (cell !== startCell) cell.querySelector(".mq-notes").appendChild(el);
+    }
+
+    const target = cell || startCell;
+    if (!target) return;
+    const crect = target.getBoundingClientRect();
+    const nx = clamp(e.clientX - crect.left - el.offsetWidth / 2, 4, Math.max(4, crect.width - el.offsetWidth - 4));
+    const ny = clamp(e.clientY - crect.top - 12, 4, Math.max(4, crect.height - el.offsetHeight - 4));
+    el.style.left = nx + "px";
+    el.style.top = ny + "px";
   });
 
   const end = (e) => {
@@ -442,15 +477,31 @@ function enableMatrixDrag(el, note) {
     try { el.releasePointerCapture(e.pointerId); } catch {}
     document.querySelectorAll(".matrix-cell").forEach((c) => c.classList.remove("mq-drop-active"));
 
-    if (moved && hoverCell) {
-      const newQ = hoverCell.dataset.quadrant;
-      if (newQ && newQ !== matrixQuadrant(note)) {
-        note.matrixQuadrant = newQ;
-        note.touchedAt = Date.now();
-        saveNotes();
-        render();
-        showToast("moved to " + QUAD_LABELS[newQ]);
+    // a plain click opens the note
+    if (!moved) {
+      openNote(note.id);
+      hoverCell = null;
+      return;
+    }
+
+    const cell = hoverCell || startCell;
+    if (cell) {
+      const crect = cell.getBoundingClientRect();
+      const er = el.getBoundingClientRect();
+      const maxX = Math.max(0, crect.width - er.width);
+      const maxY = Math.max(0, crect.height - er.height);
+      note.mqX = maxX > 0 ? Math.round(((er.left - crect.left) / maxX) * 100) : 0;
+      note.mqY = maxY > 0 ? Math.round(((er.top - crect.top) / maxY) * 100) : 0;
+
+      if (hoverCell && hoverCell !== startCell) {
+        const newQ = hoverCell.dataset.quadrant;
+        if (newQ && newQ !== matrixQuadrant(note)) {
+          note.matrixQuadrant = newQ;
+          note.touchedAt = Date.now();
+          showToast("moved to " + QUAD_LABELS[newQ]);
+        }
       }
+      saveNotes();
     }
     hoverCell = null;
   };
