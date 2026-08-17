@@ -189,6 +189,13 @@ function noteWidth(note) {
   return isLarge(note) ? NOTE_W_LARGE : NOTE_W;
 }
 
+// matrix quadrants
+const MATRIX_QUADS = ["qw", "it", "ot", "ut"];
+
+function matrixQuadrant(note) {
+  return MATRIX_QUADS.includes(note.matrixQuadrant) ? note.matrixQuadrant : "ot";
+}
+
 let toastTimer = null;
 
 function showToast(msg) {
@@ -352,6 +359,122 @@ function restoreCustom(list) {
   });
 }
 
+// render notes inside the Eisenhower / Action Priority matrix
+function layoutMatrix(list) {
+  const grid = document.getElementById("matrix-view");
+  if (!grid) return;
+
+  MATRIX_QUADS.forEach((q) => {
+    const cell = document.getElementById("mq-" + q);
+    if (!cell) return;
+    const notesWrap = cell.querySelector(".mq-notes");
+    notesWrap.innerHTML = "";
+
+    list.filter((n) => matrixQuadrant(n) === q).forEach((note) => {
+      const card = document.createElement("div");
+      card.className = "matrix-note";
+      card.setAttribute("data-note-id", note.id);
+      setPaper(card, paperColorFor(note), note.style);
+
+      // tags
+      const tagsRow = document.createElement("div");
+      tagsRow.className = "note-tags";
+      noteTags(note).forEach((t) => tagsRow.appendChild(makeTagChip(t)));
+
+      // text
+      const txt = document.createElement("p");
+      txt.className = "note-text";
+      txt.textContent = note.text;
+
+      // progress badge
+      const badge = makeProgressBadge(note.progress);
+
+      card.append(tagsRow, txt, badge);
+
+      // drag between quadrants
+      enableMatrixDrag(card, note);
+
+      // click to open detail
+      card.addEventListener("click", () => openNote(note.id));
+
+      notesWrap.appendChild(card);
+    });
+  });
+}
+
+function enableMatrixDrag(el, note) {
+  let startX = 0, startY = 0, moved = false, dragging = false;
+  let origX, origY;
+  let hoverCell = null;
+
+  el.addEventListener("pointerdown", (e) => {
+    if (e.button !== 0) return;
+    dragging = true;
+    moved = false;
+    startX = e.clientX;
+    startY = e.clientY;
+    origX = note.x;
+    origY = note.y;
+    try { el.setPointerCapture(e.pointerId); } catch {}
+    el.classList.add("dragging");
+    document.body.classList.add("is-dragging");
+  });
+
+  el.addEventListener("pointermove", (e) => {
+    if (!dragging) return;
+    const dx = e.clientX - startX;
+    const dy = e.clientY - startY;
+    if (!moved && Math.abs(dx) + Math.abs(dy) > 4) moved = true;
+    if (!moved) return;
+
+    // find which cell we're over
+    document.querySelectorAll(".matrix-cell").forEach((c) => c.classList.remove("mq-drop-active"));
+    const cell = cellAtPoint(e.clientX, e.clientY);
+    if (cell) cell.classList.add("mq-drop-active");
+    hoverCell = cell;
+  });
+
+  const end = (e) => {
+    if (!dragging) return;
+    dragging = false;
+    el.classList.remove("dragging");
+    document.body.classList.remove("is-dragging");
+    try { el.releasePointerCapture(e.pointerId); } catch {}
+    document.querySelectorAll(".matrix-cell").forEach((c) => c.classList.remove("mq-drop-active"));
+
+    if (moved && hoverCell) {
+      const newQ = hoverCell.dataset.quadrant;
+      if (newQ && newQ !== matrixQuadrant(note)) {
+        note.matrixQuadrant = newQ;
+        note.touchedAt = Date.now();
+        saveNotes();
+        render();
+        showToast("moved to " + QUAD_LABELS[newQ]);
+      }
+    }
+    hoverCell = null;
+  };
+
+  el.addEventListener("pointerup", end);
+  el.addEventListener("pointercancel", end);
+  el.addEventListener("dragstart", (e) => e.preventDefault());
+}
+
+const QUAD_LABELS = {
+  qw: "Quick Wins",
+  it: "Important Tasks",
+  ot: "Other Tasks",
+  ut: "Ungrateful Tasks",
+};
+
+function cellAtPoint(x, y) {
+  for (const c of document.querySelectorAll(".matrix-cell")) {
+    const r = c.getBoundingClientRect();
+    if (x >= r.left && x <= r.right && y >= r.top && y <= r.bottom) return c;
+  }
+  return null;
+}
+
 function defaultNotePosition(size) {
   const seq = notes.filter((n) => !isTrashed(n)).length;
   const jitter = (seq % 5) * 14;
@@ -448,6 +571,7 @@ function loadNotes() {
       n.color = oldColor ? nearestPaperId(oldColor) : "cream";
     }
     if (!PAPER_STYLES.some((s) => s.id === n.style)) n.style = "blank";
+    if (!MATRIX_QUADS.includes(n.matrixQuadrant)) n.matrixQuadrant = "ot";
     
 
     if (typeof n.views !== "number") n.views = n.likes || 0;
@@ -742,27 +866,35 @@ function render() {
   $("#note-count").textContent = notes.filter((n) => !isTrashed(n)).length;
 
   const isTrash = viewMode === "trash";
+  const isMatrix = sortMode === "matrix" && !isTrash;
+
   $("#trash-banner").hidden = !isTrash;
   $("#tag-tabs").style.display = isTrash ? "none" : "";
   $("#progress-tabs").style.display = isTrash ? "none" : "";
   $(".sort-row").style.display = isTrash ? "none" : "";
   $("#search-input").style.display = isTrash ? "none" : "";
 
+  wallEl.style.display = isMatrix ? "none" : "";
+  $("#matrix-view").hidden = !isMatrix;
+  $("#empty-state").hidden = true;
+  $("#trash-empty-state").hidden = true;
+
   if (isTrash) {
     const trashed = notes.filter(isTrashed).sort((a, b) => a.trashedAt - b.trashedAt);
     trashed.forEach((note) => wallEl.appendChild(trashNoteElement(note)));
     $("#trash-empty-state").hidden = trashed.length > 0;
-    $("#empty-state").hidden = true;
+  } else if (isMatrix) {
+    const list = visibleNotes();
+    layoutMatrix(list);
   } else {
     const list = visibleNotes();
     list.forEach((note) => wallEl.appendChild(noteElement(note)));
     $("#empty-state").hidden = list.length > 0;
-    $("#trash-empty-state").hidden = true;
   }
 
   $("#trash-count").textContent = notes.filter(isTrashed).length;
   $("#trash-btn").classList.toggle("active", isTrash);
-  updateBoardSize();
+  if (!isMatrix) updateBoardSize();
 }
 
 /* ---------- filter tabs ---------- */
@@ -1077,7 +1209,7 @@ function submitNote() {
     progress: selectedProgress,
     color: selectedColor,
     style: selectedStyle,
-
+    matrixQuadrant: "ot",
     size: noteInput.value.length > 150 ? "large" : "normal",
     source: sourceInput.value.trim(),
     views: 0,
@@ -1320,7 +1452,9 @@ document.querySelectorAll(".sort-tab").forEach((tab) => {
     sortMode = tab.dataset.sort;
     document.querySelectorAll(".sort-tab").forEach((t) => t.classList.toggle("active", t === tab));
     const list = notes.filter((n) => !isTrashed(n));
-    if (sortMode === "custom") restoreCustom(list);
+    if (sortMode === "matrix") {
+      // matrix doesn't need board positions — just render the grid
+    } else if (sortMode === "custom") restoreCustom(list);
     else if (sortMode === "random") scatterNotes(list);
     else if (sortMode === "bytag") layoutByTag(list);
     else if (sortMode === "clean") { list.sort((a, b) => (b.date || 0) - (a.date || 0)); layoutNotes(list); }

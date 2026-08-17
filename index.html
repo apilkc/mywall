@@ -37,6 +37,7 @@
             <button class="sort-tab" data-sort="newest" type="button">Newest</button>
             <button class="sort-tab" data-sort="used" type="button">Most used</button>
             <button class="sort-tab" data-sort="az" type="button">A-Z</button>
+            <button class="sort-tab" data-sort="matrix" type="button">Matrix</button>
             <button class="sort-tab" data-sort="random" type="button">Random</button>
           </div>
         </div>
@@ -64,6 +65,34 @@
     </div>
 
     <section class="wall" id="wall" aria-label="My research space"></section>
+
+    <!-- ============ MATRIX VIEW ============ -->
+    <section class="matrix-view" id="matrix-view" hidden>
+      <div class="matrix-grid">
+        <div class="matrix-cell" data-quadrant="qw" id="mq-qw">
+          <h3 class="matrix-label"><span class="mq-dot" style="background:#6ab04c"></span> Quick Wins</h3>
+          <p class="mq-hint">low effort · high impact</p>
+          <div class="mq-notes"></div>
+        </div>
+        <div class="matrix-cell" data-quadrant="it" id="mq-it">
+          <h3 class="matrix-label"><span class="mq-dot" style="background:#f0932b"></span> Important Tasks</h3>
+          <p class="mq-hint">high effort · high impact</p>
+          <div class="mq-notes"></div>
+        </div>
+        <div class="matrix-cell" data-quadrant="ot" id="mq-ot">
+          <h3 class="matrix-label"><span class="mq-dot" style="background:#95afc0"></span> Other Tasks</h3>
+          <p class="mq-hint">low effort · low impact</p>
+          <div class="mq-notes"></div>
+        </div>
+        <div class="matrix-cell" data-quadrant="ut" id="mq-ut">
+          <h3 class="matrix-label"><span class="mq-dot" style="background:#eb4d4b"></span> Ungrateful Tasks</h3>
+          <p class="mq-hint">high effort · low impact</p>
+          <div class="mq-notes"></div>
+        </div>
+      </div>
+      <div class="matrix-axis-label matrix-axis-y">IMPACT ↑</div>
+      <div class="matrix-axis-label matrix-axis-x">EFFORT →</div>
+    </section>
 
     <p class="empty-state" id="empty-state" hidden>nothing pinned here yet — pin a note to get started.</p>
     <p class="empty-state" id="trash-empty-state" hidden>the trash is empty.</p>
