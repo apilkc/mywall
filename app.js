@@ -46,11 +46,6 @@ const PAPER_STYLES = [
   { id: "lined", label: "Lined" },
 ];
 
-const NOTE_SIZES = [
-  { id: "normal", label: "normal" },
-  { id: "large", label: "large (2\u00d7)" },
-];
-
 const NOTE_MAX_CHARS = { normal: 150, large: 300 };
 const MAX_TAGS = 2;
 
@@ -97,7 +92,7 @@ let selectedProgress = "todo";
 let selectedColor = "cream";
 let selectedStyle = "blank";
 
-let selectedSize = "normal";
+
 let openNoteId = null;
 let editingNoteId = null;
 let viewMode = "wall"; // "wall" | "trash"
@@ -454,7 +449,7 @@ function loadNotes() {
     }
     if (!PAPER_STYLES.some((s) => s.id === n.style)) n.style = "blank";
     
-    if (!NOTE_SIZES.some((s) => s.id === n.size)) n.size = "normal";
+
     if (typeof n.views !== "number") n.views = n.likes || 0;
     delete n.likes;
     delete n.likedByMe;
@@ -949,31 +944,13 @@ function setProgressBadge(el, progressId) {
   el.append(dot, label);
 }
 
-function buildSizePicker() {
-  const picker = $("#size-picker");
-  picker.innerHTML = "";
-  NOTE_SIZES.forEach((s) => {
-    const b = document.createElement("button");
-    b.type = "button";
-    b.className = "size-pick" + (s.id === selectedSize ? " selected" : "");
-    b.textContent = s.label;
-    b.addEventListener("click", () => {
-      selectedSize = s.id;
-      noteInput.maxLength = NOTE_MAX_CHARS[s.id];
-      if (noteInput.value.length > noteInput.maxLength) noteInput.value = noteInput.value.slice(0, noteInput.maxLength);
-      buildSizePicker();
-      updateCharCount();
-      updatePreview();
-    });
-    picker.appendChild(b);
-  });
-}
+
 
 function updatePreview() {
   const previewNote = $("#preview-note");
   const tint = selectedTags.length === 1 ? tagById(selectedTags[0]) : null;
   setPaper(previewNote, tint ? tint.color : selectedColor, selectedStyle);
-  previewNote.classList.toggle("size-large", selectedSize === "large");
+  previewNote.classList.toggle("size-large", noteInput.value.length > 150);
  
 
   const tagsWrap = $("#preview-tags");
@@ -995,15 +972,13 @@ function openAddModal() {
   selectedColor = "cream";
   selectedStyle = "blank";
 
-  selectedSize = "normal";
-  noteInput.maxLength = NOTE_MAX_CHARS.normal;
+  noteInput.maxLength = 300;
   noteInput.value = "";
   sourceInput.value = "";
   $("#new-tag-input").value = "";
   noteInput.placeholder = NOTE_PROMPTS[Math.floor(Math.random() * NOTE_PROMPTS.length)];
   updateCharCount();
   buildPaperControls();
-  buildSizePicker();
   buildTagPicker();
   buildProgressPicker();
   updatePreview();
@@ -1029,16 +1004,14 @@ function openEditModal(id) {
   selectedColor = note.color;
   selectedStyle = note.style;
 
-  selectedSize = note.size || "normal";
   noteInput.value = note.text;
   sourceInput.value = note.source || "";
-  noteInput.maxLength = NOTE_MAX_CHARS[selectedSize];
+  noteInput.maxLength = 300;
   $("#new-tag-input").value = "";
   $("#add-note-title").textContent = "edit note";
   $("#submit-btn").textContent = "Save";
   updateCharCount();
   buildPaperControls();
-  buildSizePicker();
   buildTagPicker();
   buildProgressPicker();
   updatePreview();
@@ -1086,7 +1059,7 @@ function submitNote() {
       note.color = selectedColor;
       note.style = selectedStyle;
 
-      note.size = selectedSize;
+      note.size = noteInput.value.length > 150 ? "large" : "normal";
       note.source = sourceInput.value.trim();
       note.touchedAt = Date.now();
       saveNotes();
@@ -1096,7 +1069,7 @@ function submitNote() {
     return;
   }
 
-  const pos = defaultNotePosition(selectedSize);
+  const pos = defaultNotePosition(noteInput.value.length > 150 ? "large" : "normal");
   notes.unshift({
     id: makeId(),
     text,
@@ -1105,7 +1078,7 @@ function submitNote() {
     color: selectedColor,
     style: selectedStyle,
 
-    size: selectedSize,
+    size: noteInput.value.length > 150 ? "large" : "normal",
     source: sourceInput.value.trim(),
     views: 0,
     date: Date.now(),
@@ -1276,7 +1249,10 @@ noteInput.addEventListener("keydown", (e) => {
 });
 
 function updateCharCount() {
-  charCount.textContent = `${noteInput.value.length}/${noteInput.maxLength}`;
+  const len = noteInput.value.length;
+  const limit = len > 150 ? 300 : 150;
+  charCount.textContent = `${len}/${limit}`;
+  charCount.style.color = len > 150 ? "var(--terracotta)" : "";
 }
 
 const newTagInput = $("#new-tag-input");
