@@ -24,10 +24,9 @@
   --btn: #707070;
   --btn-text: #e8e2d8;
 
-  --serif: "Fraunces", Georgia, "Times New Roman", serif;
-  --sans: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
-  --hand: "Caveat", "Comic Sans MS", cursive;
-  --lato: "Lato", "Inter", system-ui, sans-serif;
+  --sans: "Lato", system-ui, -apple-system, sans-serif;
+  --hand: "Lato", system-ui, sans-serif;
+  --lato: "Lato", system-ui, sans-serif;
 
   --radius: 16px;
 }
@@ -63,7 +62,7 @@ html, body {
 body {
   background: var(--wall);
   color: var(--cream);
-  font-family: var(--serif);
+  font-family: var(--sans);
   font-weight: 300;
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
@@ -526,7 +525,7 @@ body.is-dragging { cursor: grabbing; }
 }
 
 .note-text {
-  font-family: var(--hand);
+  font-family: var(--sans);
   font-size: clamp(1rem, 0.85rem + 0.35vw, 1.15rem);
   font-weight: 500;
   line-height: 1.2;
@@ -536,11 +535,6 @@ body.is-dragging { cursor: grabbing; }
   flex: 1;
   min-height: 0;
   overflow: hidden;
-}
-
-.note-text.sans {
-  font-family: var(--lato);
-  letter-spacing: 0.01em;
 }
 
 .note-source {
@@ -913,6 +907,12 @@ body.is-dragging { cursor: grabbing; }
   font-size: 0.85rem;
 }
 
+.note-input {
+  resize: none;
+  overflow-y: auto;
+  max-height: 50vh;
+}
+
 .note-input::placeholder { color: var(--placeholder); font-style: italic; }
 .name-input::placeholder { color: var(--placeholder); }
 
@@ -1060,39 +1060,7 @@ body.is-dragging { cursor: grabbing; }
 
 .size-pick.selected { border-color: var(--cream); color: var(--cream); }
 
-.text-style-picker {
-  display: flex;
-  gap: 10px;
-  flex-wrap: wrap;
-}
 
-.text-style-pick {
-  display: inline-flex;
-  align-items: center;
-  gap: 10px;
-  background: var(--soft);
-  border: 1px solid var(--line);
-  border-radius: 999px;
-  padding: 8px 16px;
-  cursor: pointer;
-  font-family: var(--sans);
-  font-size: 0.8rem;
-  color: var(--gray);
-  transition: color 0.15s ease, border-color 0.15s ease;
-}
-
-.text-style-pick:hover { border-color: var(--line-strong); color: var(--cream); }
-
-.text-style-pick.selected { border-color: var(--cream); color: var(--cream); }
-
-.text-style-pick .sample {
-  font-size: 1.1rem;
-  line-height: 1;
-  color: var(--cream);
-}
-
-.text-style-pick .sample.hand { font-family: var(--hand); }
-.text-style-pick .sample.sans { font-family: var(--lato); font-weight: 700; }
 
 /* ---------- drag-drop targets ---------- */
 

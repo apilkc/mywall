@@ -46,11 +46,6 @@ const PAPER_STYLES = [
   { id: "lined", label: "Lined" },
 ];
 
-const TEXT_STYLES = [
-  { id: "hand", label: "Cursive" },
-  { id: "sans", label: "Lato" },
-];
-
 const NOTE_SIZES = [
   { id: "normal", label: "normal" },
   { id: "large", label: "large (2\u00d7)" },
@@ -101,7 +96,7 @@ let selectedTags = [];          // tag ids chosen in the modal
 let selectedProgress = "todo";
 let selectedColor = "cream";
 let selectedStyle = "blank";
-let selectedText = "hand";
+
 let selectedSize = "normal";
 let openNoteId = null;
 let editingNoteId = null;
@@ -458,7 +453,7 @@ function loadNotes() {
       n.color = oldColor ? nearestPaperId(oldColor) : "cream";
     }
     if (!PAPER_STYLES.some((s) => s.id === n.style)) n.style = "blank";
-    if (!TEXT_STYLES.some((s) => s.id === n.textStyle)) n.textStyle = "hand";
+    
     if (!NOTE_SIZES.some((s) => s.id === n.size)) n.size = "normal";
     if (typeof n.views !== "number") n.views = n.likes || 0;
     delete n.likes;
@@ -551,7 +546,7 @@ function buildNoteBody(el, note) {
   noteTags(note).forEach((t) => tagRow.appendChild(makeTagChip(t)));
 
   const text = document.createElement("p");
-  text.className = "note-text" + (note.textStyle === "sans" ? " sans" : "");
+  text.className = "note-text";
   text.textContent = note.text;
 
   const source = document.createElement("a");
@@ -974,34 +969,12 @@ function buildSizePicker() {
   });
 }
 
-function buildTextStylePicker() {
-  const picker = $("#text-style-picker");
-  picker.innerHTML = "";
-  TEXT_STYLES.forEach((s) => {
-    const b = document.createElement("button");
-    b.type = "button";
-    b.className = "text-style-pick" + (s.id === selectedText ? " selected" : "");
-    const sample = document.createElement("span");
-    sample.className = "sample " + s.id;
-    sample.textContent = "Aa";
-    const label = document.createElement("span");
-    label.textContent = s.label;
-    b.append(sample, label);
-    b.addEventListener("click", () => {
-      selectedText = s.id;
-      buildTextStylePicker();
-      updatePreview();
-    });
-    picker.appendChild(b);
-  });
-}
-
 function updatePreview() {
   const previewNote = $("#preview-note");
   const tint = selectedTags.length === 1 ? tagById(selectedTags[0]) : null;
   setPaper(previewNote, tint ? tint.color : selectedColor, selectedStyle);
   previewNote.classList.toggle("size-large", selectedSize === "large");
-  $("#preview-text").className = "note-text" + (selectedText === "sans" ? " sans" : "");
+ 
 
   const tagsWrap = $("#preview-tags");
   tagsWrap.innerHTML = "";
@@ -1021,7 +994,7 @@ function openAddModal() {
   selectedProgress = "todo";
   selectedColor = "cream";
   selectedStyle = "blank";
-  selectedText = "hand";
+
   selectedSize = "normal";
   noteInput.maxLength = NOTE_MAX_CHARS.normal;
   noteInput.value = "";
@@ -1030,13 +1003,15 @@ function openAddModal() {
   noteInput.placeholder = NOTE_PROMPTS[Math.floor(Math.random() * NOTE_PROMPTS.length)];
   updateCharCount();
   buildPaperControls();
-  buildTextStylePicker();
   buildSizePicker();
   buildTagPicker();
   buildProgressPicker();
   updatePreview();
   addModal.hidden = false;
-  setTimeout(() => noteInput.focus(), 60);
+  setTimeout(() => {
+    noteInput.focus();
+    autogrowNoteInput();
+  }, 60);
 }
 
 function closeAddModal() {
@@ -1053,7 +1028,7 @@ function openEditModal(id) {
   selectedProgress = note.progress;
   selectedColor = note.color;
   selectedStyle = note.style;
-  selectedText = note.textStyle || "hand";
+
   selectedSize = note.size || "normal";
   noteInput.value = note.text;
   sourceInput.value = note.source || "";
@@ -1063,13 +1038,15 @@ function openEditModal(id) {
   $("#submit-btn").textContent = "Save";
   updateCharCount();
   buildPaperControls();
-  buildTextStylePicker();
   buildSizePicker();
   buildTagPicker();
   buildProgressPicker();
   updatePreview();
   addModal.hidden = false;
-  setTimeout(() => noteInput.focus(), 60);
+  setTimeout(() => {
+    noteInput.focus();
+    autogrowNoteInput();
+  }, 60);
 }
 
 function addNewTag() {
@@ -1108,7 +1085,7 @@ function submitNote() {
       note.progress = selectedProgress;
       note.color = selectedColor;
       note.style = selectedStyle;
-      note.textStyle = selectedText;
+
       note.size = selectedSize;
       note.source = sourceInput.value.trim();
       note.touchedAt = Date.now();
@@ -1127,7 +1104,7 @@ function submitNote() {
     progress: selectedProgress,
     color: selectedColor,
     style: selectedStyle,
-    textStyle: selectedText,
+
     size: selectedSize,
     source: sourceInput.value.trim(),
     views: 0,
@@ -1166,7 +1143,7 @@ function openNote(id) {
   noteTags(note).forEach((t) => tagsWrap.appendChild(makeTagChip(t)));
 
   const detailText = $("#detail-text");
-  detailText.className = "note-text" + (note.textStyle === "sans" ? " sans" : "");
+  detailText.className = "note-text";
   detailText.textContent = note.text;
 
   const src = $("#detail-source");
@@ -1278,7 +1255,13 @@ $("#theme-btn").addEventListener("click", () => {
   applyTheme(currentTheme() === "light" ? "dark" : "light");
 });
 
+function autogrowNoteInput() {
+  noteInput.style.height = "auto";
+  noteInput.style.height = noteInput.scrollHeight + "px";
+}
+
 noteInput.addEventListener("input", () => {
+  autogrowNoteInput();
   updateCharCount();
   updatePreview();
 });
