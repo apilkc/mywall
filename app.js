@@ -46,6 +46,11 @@ const PAPER_STYLES = [
   { id: "lined", label: "Lined" },
 ];
 
+const TEXT_STYLES = [
+  { id: "hand", label: "Cursive" },
+  { id: "sans", label: "Lato" },
+];
+
 const NOTE_SIZES = [
   { id: "normal", label: "normal" },
   { id: "large", label: "large (2\u00d7)" },
@@ -96,6 +101,7 @@ let selectedTags = [];          // tag ids chosen in the modal
 let selectedProgress = "todo";
 let selectedColor = "cream";
 let selectedStyle = "blank";
+let selectedText = "hand";
 let selectedSize = "normal";
 let openNoteId = null;
 let editingNoteId = null;
@@ -145,11 +151,20 @@ function noteTags(note) {
 }
 
 function setPaper(el, colorId, styleId) {
-  const c = PAPER_COLORS.find((c) => c.id === colorId) || PAPER_COLORS[0];
+  const c = PAPER_COLORS.find((c) => c.id === colorId);
+  const hex = c ? c.color : colorId; // accept a paper id or a raw hex (tag colors)
   const style = PAPER_STYLES.some((s) => s.id === styleId) ? styleId : "blank";
-  el.style.setProperty("--paper", c.color);
+  el.style.setProperty("--paper", hex);
   el.classList.remove("paper-blank", "paper-grid", "paper-lined");
   el.classList.add("paper-" + style);
+}
+
+// paper background for a note: its own paper color, or its single tag's color when
+// it has exactly one tag (so a one-tag note reads as "belonging" to that tag)
+function paperColorFor(note) {
+  const t = noteTags(note);
+  if (t.length === 1) return t[0].color;
+  return (PAPER_COLORS.find((c) => c.id === note.color) || PAPER_COLORS[0]).color;
 }
 
 function hexToRgb(hex) {
@@ -379,8 +394,25 @@ function loadTags() {
   if (!Array.isArray(list) || list.length === 0) list = DEFAULT_TAGS.map((t) => ({ ...t }));
   list.forEach((t) => {
     if (!t.id) t.id = makeId();
+    if (!t.color) t.color = "";
+  });
+  // give every tag its own color: fill missing ones, and break ties so no two tags share a color
+  const used = new Set();
+  list.forEach((t) => {
+    if (used.has(t.color)) t.color = ""; // duplicate -> needs a fresh color
+    if (!t.color) {
+      const free = TAG_PALETTE.find((c) => !used.has(c));
+      t.color = free || TAG_PALETTE[Math.floor(Math.random() * TAG_PALETTE.length)];
+    }
+    used.add(t.color);
   });
   return list;
+}
+
+// pick a palette color no current tag is using (falls back to cycling once all are taken)
+function nextTagColor() {
+  const used = new Set(tags.map((t) => t.color));
+  return TAG_PALETTE.find((c) => !used.has(c)) || TAG_PALETTE[tags.length % TAG_PALETTE.length];
 }
 
 function saveTags() {
@@ -394,7 +426,7 @@ function saveTags() {
 function ensureTagByLabel(label) {
   const existing = tags.find((t) => t.label.toLowerCase() === label.toLowerCase());
   if (existing) return existing;
-  const tag = { id: makeId(), label, color: TAG_PALETTE[tags.length % TAG_PALETTE.length] };
+  const tag = { id: makeId(), label, color: nextTagColor() };
   tags.push(tag);
   saveTags();
   return tag;
@@ -426,6 +458,7 @@ function loadNotes() {
       n.color = oldColor ? nearestPaperId(oldColor) : "cream";
     }
     if (!PAPER_STYLES.some((s) => s.id === n.style)) n.style = "blank";
+    if (!TEXT_STYLES.some((s) => s.id === n.textStyle)) n.textStyle = "hand";
     if (!NOTE_SIZES.some((s) => s.id === n.size)) n.size = "normal";
     if (typeof n.views !== "number") n.views = n.likes || 0;
     delete n.likes;
@@ -518,7 +551,7 @@ function buildNoteBody(el, note) {
   noteTags(note).forEach((t) => tagRow.appendChild(makeTagChip(t)));
 
   const text = document.createElement("p");
-  text.className = "note-text";
+  text.className = "note-text" + (note.textStyle === "sans" ? " sans" : "");
   text.textContent = note.text;
 
   const source = document.createElement("a");
@@ -659,7 +692,7 @@ function noteElement(note) {
   el.tabIndex = 0;
   el.setAttribute("role", "button");
   el.setAttribute("aria-label", note.text);
-  setPaper(el, note.color, note.style);
+  setPaper(el, paperColorFor(note), note.style);
   if (note.size === "large") el.classList.add("size-large");
   el.style.left = (note.x || 0) + "px";
   el.style.top = (note.y || 0) + "px";
@@ -941,10 +974,34 @@ function buildSizePicker() {
   });
 }
 
+function buildTextStylePicker() {
+  const picker = $("#text-style-picker");
+  picker.innerHTML = "";
+  TEXT_STYLES.forEach((s) => {
+    const b = document.createElement("button");
+    b.type = "button";
+    b.className = "text-style-pick" + (s.id === selectedText ? " selected" : "");
+    const sample = document.createElement("span");
+    sample.className = "sample " + s.id;
+    sample.textContent = "Aa";
+    const label = document.createElement("span");
+    label.textContent = s.label;
+    b.append(sample, label);
+    b.addEventListener("click", () => {
+      selectedText = s.id;
+      buildTextStylePicker();
+      updatePreview();
+    });
+    picker.appendChild(b);
+  });
+}
+
 function updatePreview() {
   const previewNote = $("#preview-note");
-  setPaper(previewNote, selectedColor, selectedStyle);
+  const tint = selectedTags.length === 1 ? tagById(selectedTags[0]) : null;
+  setPaper(previewNote, tint ? tint.color : selectedColor, selectedStyle);
   previewNote.classList.toggle("size-large", selectedSize === "large");
+  $("#preview-text").className = "note-text" + (selectedText === "sans" ? " sans" : "");
 
   const tagsWrap = $("#preview-tags");
   tagsWrap.innerHTML = "";
@@ -964,6 +1021,7 @@ function openAddModal() {
   selectedProgress = "todo";
   selectedColor = "cream";
   selectedStyle = "blank";
+  selectedText = "hand";
   selectedSize = "normal";
   noteInput.maxLength = NOTE_MAX_CHARS.normal;
   noteInput.value = "";
@@ -972,6 +1030,7 @@ function openAddModal() {
   noteInput.placeholder = NOTE_PROMPTS[Math.floor(Math.random() * NOTE_PROMPTS.length)];
   updateCharCount();
   buildPaperControls();
+  buildTextStylePicker();
   buildSizePicker();
   buildTagPicker();
   buildProgressPicker();
@@ -994,6 +1053,7 @@ function openEditModal(id) {
   selectedProgress = note.progress;
   selectedColor = note.color;
   selectedStyle = note.style;
+  selectedText = note.textStyle || "hand";
   selectedSize = note.size || "normal";
   noteInput.value = note.text;
   sourceInput.value = note.source || "";
@@ -1003,6 +1063,7 @@ function openEditModal(id) {
   $("#submit-btn").textContent = "Save";
   updateCharCount();
   buildPaperControls();
+  buildTextStylePicker();
   buildSizePicker();
   buildTagPicker();
   buildProgressPicker();
@@ -1015,7 +1076,7 @@ function addNewTag() {
   const input = $("#new-tag-input");
   const label = input.value.trim();
   if (!label) return;
-  const tag = { id: makeId(), label, color: TAG_PALETTE[tags.length % TAG_PALETTE.length] };
+  const tag = { id: makeId(), label, color: nextTagColor() };
   tags.push(tag);
   saveTags();
   if (!selectedTags.includes(tag.id)) {
@@ -1047,6 +1108,7 @@ function submitNote() {
       note.progress = selectedProgress;
       note.color = selectedColor;
       note.style = selectedStyle;
+      note.textStyle = selectedText;
       note.size = selectedSize;
       note.source = sourceInput.value.trim();
       note.touchedAt = Date.now();
@@ -1065,6 +1127,7 @@ function submitNote() {
     progress: selectedProgress,
     color: selectedColor,
     style: selectedStyle,
+    textStyle: selectedText,
     size: selectedSize,
     source: sourceInput.value.trim(),
     views: 0,
@@ -1095,14 +1158,16 @@ function openNote(id) {
   openNoteId = id;
 
   const detail = $("#detail-note");
-  setPaper(detail, note.color, note.style);
+  setPaper(detail, paperColorFor(note), note.style);
   detail.classList.toggle("size-large", note.size === "large");
 
   const tagsWrap = $("#detail-tags");
   tagsWrap.innerHTML = "";
   noteTags(note).forEach((t) => tagsWrap.appendChild(makeTagChip(t)));
 
-  $("#detail-text").textContent = note.text;
+  const detailText = $("#detail-text");
+  detailText.className = "note-text" + (note.textStyle === "sans" ? " sans" : "");
+  detailText.textContent = note.text;
 
   const src = $("#detail-source");
   src.textContent = note.source || "";
@@ -1254,6 +1319,32 @@ $("#trash-btn").addEventListener("click", () => {
 $("#back-to-wall").addEventListener("click", () => {
   viewMode = "wall";
   render();
+});
+
+// clicking the title returns to the home wall: clears filters and search, closes
+// any open modal/popup, and restores the hand-arranged Custom layout
+function goHome() {
+  closeAddModal();
+  closePopup();
+  viewMode = "wall";
+  activeTag = "all";
+  progressFilter = "all";
+  searchQuery = "";
+  $("#search-input").value = "";
+  sortMode = "custom";
+  document.querySelectorAll(".sort-tab").forEach((t) => t.classList.toggle("active", t.dataset.sort === "custom"));
+  buildTagTabs();
+  buildProgressTabs();
+  restoreCustom(notes.filter((n) => !isTrashed(n)));
+  render();
+}
+
+$(".brand").addEventListener("click", goHome);
+$(".brand").addEventListener("keydown", (e) => {
+  if (e.key === "Enter" || e.key === " ") {
+    e.preventDefault();
+    goHome();
+  }
 });
 
 document.querySelectorAll("[data-close-modal]").forEach((el) => {

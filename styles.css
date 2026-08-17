@@ -27,6 +27,7 @@
   --serif: "Fraunces", Georgia, "Times New Roman", serif;
   --sans: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
   --hand: "Caveat", "Comic Sans MS", cursive;
+  --lato: "Lato", "Inter", system-ui, sans-serif;
 
   --radius: 16px;
 }
@@ -110,6 +111,16 @@ body {
   font-weight: 400;
   letter-spacing: -0.01em;
   color: var(--cream);
+  cursor: pointer;
+  transition: opacity 0.15s ease;
+}
+
+.brand:hover { opacity: 0.8; }
+
+.brand:focus-visible {
+  outline: 2px solid var(--cream);
+  outline-offset: 4px;
+  border-radius: 4px;
 }
 
 .counter {
@@ -525,6 +536,11 @@ body.is-dragging { cursor: grabbing; }
   flex: 1;
   min-height: 0;
   overflow: hidden;
+}
+
+.note-text.sans {
+  font-family: var(--lato);
+  letter-spacing: 0.01em;
 }
 
 .note-source {
@@ -1043,6 +1059,40 @@ body.is-dragging { cursor: grabbing; }
 .size-pick:hover { border-color: var(--line-strong); color: var(--cream); }
 
 .size-pick.selected { border-color: var(--cream); color: var(--cream); }
+
+.text-style-picker {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.text-style-pick {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  background: var(--soft);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 8px 16px;
+  cursor: pointer;
+  font-family: var(--sans);
+  font-size: 0.8rem;
+  color: var(--gray);
+  transition: color 0.15s ease, border-color 0.15s ease;
+}
+
+.text-style-pick:hover { border-color: var(--line-strong); color: var(--cream); }
+
+.text-style-pick.selected { border-color: var(--cream); color: var(--cream); }
+
+.text-style-pick .sample {
+  font-size: 1.1rem;
+  line-height: 1;
+  color: var(--cream);
+}
+
+.text-style-pick .sample.hand { font-family: var(--hand); }
+.text-style-pick .sample.sans { font-family: var(--lato); font-weight: 700; }
 
 /* ---------- drag-drop targets ---------- */
 

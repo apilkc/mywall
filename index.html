@@ -14,7 +14,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link
-    href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,400;0,9..144,500;0,9..144,600;1,9..144,300;1,9..144,400&family=Inter:wght@300;400;500&family=Caveat:wght@400;500;600&display=swap"
+    href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,400;0,9..144,500;0,9..144,600;1,9..144,300;1,9..144,400&family=Inter:wght@300;400;500&family=Caveat:wght@400;500;600&family=Lato:wght@400;700&display=swap"
     rel="stylesheet"
   />
   <link rel="stylesheet" href="styles.css" />
@@ -25,7 +25,7 @@
     <header class="topbar">
       <div class="topbar-main">
         <div class="topbar-left">
-          <h1 class="brand">My research space</h1>
+          <h1 class="brand" tabindex="0" role="button" aria-label="My research space — go to the home wall" title="go to the home wall">My research space</h1>
           <p class="counter"><span id="note-count">0</span> NOTES PINNED</p>
         </div>
         <div class="topbar-right">
@@ -92,6 +92,11 @@
         <legend>PAPER</legend>
         <div class="paper-colors" id="paper-colors"></div>
         <div class="paper-styles" id="paper-styles"></div>
+      </fieldset>
+
+      <fieldset class="option-group">
+        <legend>TEXT STYLE</legend>
+        <div class="text-style-picker" id="text-style-picker"></div>
       </fieldset>
 
       <fieldset class="option-group">
