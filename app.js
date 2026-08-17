@@ -49,6 +49,9 @@ const PAPER_STYLES = [
 const NOTE_MAX_CHARS = { normal: 150, large: 300 };
 const MAX_TAGS = 2;
 
+// matrix quadrants (declared early: loadNotes() migration below reads it)
+const MATRIX_QUADS = ["qw", "it", "ot", "ut"];
+
 // board layout constants (used for initial placement + "arrange" sorts)
 const BOARD_PAD = 20;
 const GAP = 20;
@@ -188,9 +191,6 @@ function isLarge(note) {
 function noteWidth(note) {
   return isLarge(note) ? NOTE_W_LARGE : NOTE_W;
 }
-
-// matrix quadrants
-const MATRIX_QUADS = ["qw", "it", "ot", "ut"];
 
 function matrixQuadrant(note) {
   return MATRIX_QUADS.includes(note.matrixQuadrant) ? note.matrixQuadrant : "ot";
