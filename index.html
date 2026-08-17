@@ -88,6 +88,25 @@
         </div>
       </div>
 
+      <label class="field-label" for="note-input">YOUR NOTE</label>
+      <textarea
+        id="note-input"
+        class="note-input"
+        rows="3"
+        maxlength="150"
+        placeholder="a thought, a question, a to-do..."
+      ></textarea>
+      <div class="char-count" id="char-count">0/150</div>
+
+      <label class="field-label" for="source-input">SOURCE / LINK <span class="opt">(optional)</span></label>
+      <input
+        id="source-input"
+        class="name-input"
+        type="text"
+        maxlength="200"
+        placeholder="a paper, DOI, url, or where you got this..."
+      />
+
       <fieldset class="option-group">
         <legend>PAPER</legend>
         <div class="paper-colors" id="paper-colors"></div>
@@ -117,25 +136,6 @@
         <legend>PROGRESS</legend>
         <div class="progress-picker" id="progress-picker"></div>
       </fieldset>
-
-      <label class="field-label" for="note-input">YOUR NOTE</label>
-      <textarea
-        id="note-input"
-        class="note-input"
-        rows="3"
-        maxlength="150"
-        placeholder="a thought, a question, a to-do..."
-      ></textarea>
-      <div class="char-count" id="char-count">0/150</div>
-
-      <label class="field-label" for="source-input">SOURCE / LINK <span class="opt">(optional)</span></label>
-      <input
-        id="source-input"
-        class="name-input"
-        type="text"
-        maxlength="200"
-        placeholder="a paper, DOI, url, or where you got this..."
-      />
 
       <button id="submit-btn" class="btn-submit" type="button">Pin</button>
     </div>
