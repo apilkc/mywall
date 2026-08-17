@@ -1350,8 +1350,107 @@ document.addEventListener("keydown", (e) => {
   if (!notePopup.hidden) closePopup();
 });
 
+/* ---------- pin gate ---------- */
+
+const PIN_KEY = "research-wall-pin";
+const PIN_CODE = "1234";           // <-- change this to your own 4-digit code
+const PIN_TTL = 60 * 60 * 1000;   // 1 hour
+
+function pinSessionValid() {
+  try {
+    const raw = localStorage.getItem(PIN_KEY);
+    if (!raw) return false;
+    const s = JSON.parse(raw);
+    return s.ok === true && typeof s.exp === "number" && s.exp > Date.now();
+  } catch { return false; }
+}
+
+function pinSessionSave() {
+  try {
+    localStorage.setItem(PIN_KEY, JSON.stringify({ ok: true, exp: Date.now() + PIN_TTL }));
+  } catch { /* ignore */ }
+}
+
+function hidePinGate() {
+  const gate = document.getElementById("pin-gate");
+  if (gate) gate.hidden = true;
+}
+
+function setupPinGate() {
+  if (pinSessionValid()) { hidePinGate(); return; }
+
+  const gate = document.getElementById("pin-gate");
+  const digits = document.querySelectorAll(".pin-digit");
+  const error = document.getElementById("pin-error");
+  if (!gate || !digits.length) return;
+
+  function focusDigit(i) {
+    if (i >= 0 && i < digits.length) digits[i].focus();
+  }
+
+  function collectCode() {
+    return [...digits].map((d) => d.value).join("");
+  }
+
+  function clearDigits() {
+    digits.forEach((d) => { d.value = ""; d.classList.remove("error"); });
+    error.hidden = true;
+    focusDigit(0);
+  }
+
+  function shakeDigits() {
+    digits.forEach((d) => d.classList.add("error"));
+    error.hidden = false;
+    setTimeout(clearDigits, 700);
+  }
+
+  // auto-advance on input, auto-back on delete
+  digits.forEach((d, i) => {
+    d.addEventListener("input", () => {
+      d.value = d.value.replace(/[^0-9]/g, "");
+      if (d.value) {
+        if (i < digits.length - 1) focusDigit(i + 1);
+        else {
+          // all 4 filled — check immediately
+          const code = collectCode();
+          if (code.length === 4) {
+            if (code === PIN_CODE) {
+              pinSessionSave();
+              hidePinGate();
+            } else {
+              shakeDigits();
+            }
+          }
+        }
+      }
+    });
+    d.addEventListener("keydown", (e) => {
+      if (e.key === "Backspace" && !d.value && i > 0) {
+        digits[i - 1].value = "";
+        focusDigit(i - 1);
+      }
+      if (e.key === "Enter") {
+        const code = collectCode();
+        if (code.length === 4) {
+          if (code === PIN_CODE) {
+            pinSessionSave();
+            hidePinGate();
+          } else {
+            shakeDigits();
+          }
+        }
+      }
+    });
+    // select text on focus for easy replacement
+    d.addEventListener("focus", () => d.select());
+  });
+
+  focusDigit(0);
+}
+
 /* ---------- boot ---------- */
 
+setupPinGate();
 updateThemeBtn();
 buildTagTabs();
 buildProgressTabs();
