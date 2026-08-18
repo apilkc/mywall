@@ -1,18 +1,21 @@
-// Firebase Realtime Database config for cross-device sync.
+// Firebase Realtime Database config for real-time sync.
 //
-// The database URL is not secret. Security comes from (a) your private
-// sync code and (b) the security rules — paste these in the Realtime
-// Database "Rules" tab in the Firebase console, then Publish:
+// Every device that opens the site reads and writes this ONE wall, so
+// your notes sync automatically and in real time — no login, no code,
+// no QR. The wall id is below; the database URL is not secret.
+//
+// Recommended security rule (paste in the Realtime Database "Rules" tab):
 //
 //   {
 //     "rules": {
 //       ".read": false,
 //       ".write": false,
 //       "walls": {
-//         "$code": { ".read": true, ".write": true }
+//         "wall-8f3k2m9q": { ".read": true, ".write": true }
 //       }
 //     }
 //   }
 window.SYNC_CONFIG = {
   databaseURL: "https://mywall-f4bc6-default-rtdb.firebaseio.com",
+  wallId: "wall-8f3k2m9q",
 };

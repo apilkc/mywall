@@ -17,7 +17,7 @@
     href="https://fonts.googleapis.com/css2?family=Lato:wght@300;400;700&display=swap"
     rel="stylesheet"
   />
-  <link rel="stylesheet" href="styles.css?v=13" />
+  <link rel="stylesheet" href="styles.css?v=14" />
 </head>
 <body>
   <!-- ============ WALL VIEW ============ -->
@@ -26,7 +26,7 @@
       <div class="topbar-main">
         <div class="topbar-left">
           <h1 class="brand" tabindex="0" role="button" aria-label="My research space — go to the home wall" title="go to the home wall">My research space</h1>
-          <p class="counter"><span id="note-count">0</span> NOTES PINNED <span class="version-badge" id="version-badge" title="deployed version">v13</span></p>
+          <p class="counter"><span id="note-count">0</span> NOTES PINNED <span class="version-badge" id="version-badge" title="deployed version">v14</span></p>
         </div>
         <div class="topbar-right">
           <div class="sort-row" role="group" aria-label="Sort the wall">
@@ -52,7 +52,6 @@
             &#128465; trash <span class="trash-count" id="trash-count">0</span>
           </button>
           <input class="search" id="search-input" type="search" placeholder="search the wall..." aria-label="Search the wall" />
-          <button class="sync-btn" id="sync-btn" type="button" aria-label="Sync across devices">&#9729; sync</button>
           <button class="theme-btn" id="theme-btn" type="button" aria-label="Toggle light or dark background">
             <span id="theme-icon">&#9790;</span> <span id="theme-label">dark</span>
           </button>
@@ -177,34 +176,9 @@
     </div>
   </div>
 
-  <!-- ============ SYNC MODAL ============ -->
-  <div id="sync-modal" class="modal" hidden>
-    <div class="modal-scrim" data-close-sync></div>
-    <div class="modal-card sync-card" role="dialog" aria-modal="true" aria-labelledby="sync-title">
-      <button class="modal-close" type="button" data-close-sync aria-label="close">&#10005;</button>
-      <h2 id="sync-title" class="modal-title">sync across devices</h2>
-      <p class="sync-desc">Use the <strong>same code</strong> on your phone and laptop to share this wall. Anyone with the code can read it, so keep it private.</p>
-      <label class="field-label" for="sync-code-input">SYNC CODE</label>
-      <input id="sync-code-input" class="name-input sync-code-input" type="text" maxlength="60" placeholder="e.g. cedar-ember-42" autocomplete="off" spellcheck="false" />
-      <div class="sync-actions">
-        <button id="sync-generate" class="btn-text" type="button">generate a code</button>
-        <button id="sync-connect" class="btn-submit" type="button">connect</button>
-      </div>
-      <div class="sync-linked" id="sync-linked" hidden>
-        <p class="sync-desc">Scan this with your other device to link it — no typing needed:</p>
-        <img class="sync-qr" id="sync-qr" alt="QR code to link another device" />
-        <div class="sync-code-row">
-          <code class="sync-code-value" id="sync-code-value"></code>
-          <button id="sync-copy" class="btn-text" type="button">copy</button>
-        </div>
-      </div>
-      <p class="sync-status" id="sync-status"></p>
-      <p class="sync-last" id="sync-last" hidden></p>
-      <button id="sync-disconnect" class="btn-text" type="button" hidden>disconnect this device</button>
-    </div>
-  </div>
-
-  <script src="firebase-config.js?v=12"></script>
-  <script src="app.js?v=13"></script>
+  <script src="firebase-config.js?v=14"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.13.1/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.13.1/firebase-database-compat.js"></script>
+  <script src="app.js?v=14"></script>
 </body>
 </html>

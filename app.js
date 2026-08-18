@@ -7,9 +7,7 @@
 const STORAGE_KEY = "research-wall-v1";
 const TAGS_KEY = "research-wall-tags-v1";
 const THEME_KEY = "research-wall-theme";
-const SYNC_CODE_KEY = "research-wall-sync-code";
 const SYNC_UPDATED_KEY = "research-wall-sync-updatedAt";
-const LAST_SYNC_KEY = "research-wall-last-sync";
 const TRASH_DAYS = 30; // keep trashed notes at least this many days
 const DAY_MS = 86400000;
 
@@ -87,10 +85,9 @@ const NOTE_PROMPTS = [
 
 /* ---------- state ---------- */
 
-let syncCode = "";
-let syncState = "setup"; // setup | checking | syncing | synced | offline
+let syncDb = null;
+let syncRef = null;
 let syncPushTimer = null;
-let syncInFlight = false;
 
 let sortMode = "custom";
 let tags = loadTags();
@@ -668,20 +665,17 @@ function saveNotes() {
   scheduleSync();
 }
 
-/* ---------- cross-device sync (Firebase Realtime DB REST) ---------- */
+/* ---------- real-time sync (Firebase Realtime Database) ---------- */
 
 function syncConfigured() {
   const cfg = window.SYNC_CONFIG || {};
   const url = (cfg.databaseURL || "").trim();
-  return url.startsWith("https://") && !/YOUR_/i.test(url) && !/example/i.test(url);
+  return url.startsWith("https://") && !/YOUR_/i.test(url) && !/example/i.test(url) && typeof firebase !== "undefined";
 }
 
-function syncBaseUrl() {
-  return ((window.SYNC_CONFIG && window.SYNC_CONFIG.databaseURL) || "").replace(/\/+$/, "");
-}
-
-function syncWallUrl() {
-  return syncBaseUrl() + "/walls/" + encodeURIComponent(syncCode) + ".json";
+function syncWallId() {
+  const cfg = window.SYNC_CONFIG || {};
+  return (cfg.wallId || "wall-home").replace(/[^a-zA-Z0-9_-]/g, "");
 }
 
 function syncUpdatedAt() {
@@ -692,188 +686,56 @@ function setSyncUpdatedAt(t) {
   try { localStorage.setItem(SYNC_UPDATED_KEY, String(t)); } catch {}
 }
 
-function lastSyncAt() {
-  try { return Number(localStorage.getItem(LAST_SYNC_KEY)) || 0; } catch { return 0; }
-}
-
-function setLastSyncAt(t) {
-  try { localStorage.setItem(LAST_SYNC_KEY, String(t)); } catch {}
-}
-
-function formatSyncTime(t) {
-  if (!t) return "";
-  const diff = Date.now() - t;
-  if (diff < 60000) return "just now";
-  if (diff < 3600000) return Math.floor(diff / 60000) + " min ago";
-  if (diff < 86400000) return Math.floor(diff / 3600000) + " hr ago";
-  const d = new Date(t);
-  return d.toLocaleDateString([], { month: "short", day: "numeric" }) + " at " + d.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
-}
-
-function setSyncState(state) {
-  syncState = state;
-  const btn = $("#sync-btn");
-  if (!btn) return;
-  btn.dataset.state = state;
-  const labels = {
-    setup: "\u2601 sync",
-    checking: "\u2601 syncing\u2026",
-    syncing: "\u2601 syncing\u2026",
-    synced: "\u2601 synced",
-    offline: "\u2601 offline",
-  };
-  btn.textContent = labels[state] || labels.setup;
-  const status = $("#sync-status");
-  if (status) {
-    const msgs = {
-      setup: syncConfigured()
-        ? "Not connected. Enter a code to sync this wall across your devices."
-        : "Sync isn't set up yet. Paste your database URL into firebase-config.js first.",
-      checking: "Checking for your notes\u2026",
-      syncing: "Saving to the cloud\u2026",
-      synced: "Synced \u2713 \u2014 scan the code below on your other device to link it.",
-      offline: "Couldn't reach the server. Notes are saved on this device only.",
-    };
-    status.textContent = msgs[state] || "";
-    status.classList.toggle("is-error", state === "offline");
-  }
-  const disc = $("#sync-disconnect");
-  if (disc) disc.hidden = !syncCode;
-  updateSyncLast();
-}
-
-function updateSyncLast() {
-  const el = $("#sync-last");
-  if (!el) return;
-  const t = lastSyncAt();
-  if (t) {
-    el.hidden = false;
-    el.textContent = "cloud last updated: " + formatSyncTime(t);
-  } else {
-    el.hidden = true;
-  }
-}
-
-function syncPayload() {
-  return { notes: notes, tags: tags, updatedAt: syncUpdatedAt() };
-}
-
-async function syncPush() {
-  const res = await fetch(syncWallUrl(), {
-    method: "PUT",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(syncPayload()),
-  });
-  if (!res.ok) throw new Error("HTTP " + res.status);
-}
-
-async function syncPull() {
-  const res = await fetch(syncWallUrl());
-  if (!res.ok) throw new Error("HTTP " + res.status);
-  const data = await res.json();
-  return data && typeof data === "object" && Array.isArray(data.notes) ? data : null;
-}
-
 function scheduleSync() {
-  if (!syncConfigured() || !syncCode) return;
+  if (!syncRef) return;
   clearTimeout(syncPushTimer);
-  syncPushTimer = setTimeout(pushNow, 900);
+  syncPushTimer = setTimeout(pushNow, 400);
 }
 
-async function pushNow() {
-  if (syncInFlight) return;
-  syncInFlight = true;
-  setSyncState("syncing");
-  setSyncUpdatedAt(Date.now());
+function pushNow() {
+  if (!syncRef) return;
+  const t = Date.now();
+  setSyncUpdatedAt(t);
+  syncRef.set({ notes: notes, tags: tags, updatedAt: t }).catch(() => {});
+}
+
+function applyRemote(remote) {
+  if (!remote || !Array.isArray(remote.notes)) return;
+  const remoteTs = Number(remote.updatedAt) || 0;
+  if (remoteTs <= syncUpdatedAt()) return;
+  notes = remote.notes;
+  tags = Array.isArray(remote.tags) && remote.tags.length ? remote.tags : tags;
+  setSyncUpdatedAt(remoteTs);
+  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(notes)); } catch {}
+  try { localStorage.setItem(TAGS_KEY, JSON.stringify(tags)); } catch {}
+  activeTag = "all";
+  buildTagTabs();
+  render();
+}
+
+function initSync() {
+  if (!syncConfigured()) return;
   try {
-    await syncPush();
-    setLastSyncAt(Date.now());
-    setSyncState("synced");
+    const url = (window.SYNC_CONFIG.databaseURL || "").replace(/\/+$/, "");
+    if (!firebase.apps.length) {
+      firebase.initializeApp({ databaseURL: url });
+    }
+    syncDb = firebase.database();
+    syncRef = syncDb.ref("walls/" + syncWallId());
   } catch (err) {
-    setSyncState("offline");
-  } finally {
-    syncInFlight = false;
-  }
-}
-
-async function initSync() {
-  try { syncCode = localStorage.getItem(SYNC_CODE_KEY) || ""; } catch { syncCode = ""; }
-  if (!syncConfigured()) { setSyncState("setup"); updateSyncLinked(); return; }
-  if (!syncCode) {
-    // automatic: this device gets its own private wall, no clicks needed
-    syncCode = generateSyncCode();
-    try { localStorage.setItem(SYNC_CODE_KEY, syncCode); } catch {}
-  }
-  updateSyncLinked();
-
-  setSyncState("checking");
-  let remote = null;
-  try { remote = await syncPull(); } catch { remote = null; }
-
-  if (!remote) {
-    await pushNow();
+    syncRef = null;
     return;
   }
 
-  const remoteTs = Number(remote.updatedAt) || 0;
-  const localTs = syncUpdatedAt();
-
-  if (remoteTs > localTs && Array.isArray(remote.notes)) {
-    notes = remote.notes;
-    tags = Array.isArray(remote.tags) && remote.tags.length ? remote.tags : tags;
-    setSyncUpdatedAt(remoteTs);
-    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(notes)); } catch {}
-    try { localStorage.setItem(TAGS_KEY, JSON.stringify(tags)); } catch {}
-    activeTag = "all";
-    buildTagTabs();
-    render();
-    setLastSyncAt(remoteTs);
-    setSyncState("synced");
-  } else {
-    await pushNow();
-  }
-}
-
-function connectSync(code) {
-  const clean = (code || "").trim().toLowerCase().replace(/\s+/g, "-").replace(/-+/g, "-");
-  if (!clean) return;
-  syncCode = clean;
-  try { localStorage.setItem(SYNC_CODE_KEY, syncCode); } catch {}
-  const input = $("#sync-code-input");
-  if (input) input.value = syncCode;
-  updateSyncLinked();
-  initSync();
-}
-
-function disconnectSync() {
-  syncCode = "";
-  try { localStorage.removeItem(SYNC_CODE_KEY); } catch {}
-  const input = $("#sync-code-input");
-  if (input) input.value = "";
-  updateSyncLinked();
-  setSyncState("setup");
-}
-
-function generateSyncCode() {
-  const words = ["oak","river","amber","falcon","cedar","ember","maple","harbor","quartz","lumen","nimbus","petal","spruce","tide","willow","canyon","meadow","aspen","summit","briar"];
-  const pick = () => words[Math.floor(Math.random() * words.length)];
-  return pick() + "-" + pick() + "-" + Math.floor(10 + Math.random() * 90);
-}
-
-function syncLinkUrl() {
-  return location.origin + location.pathname + "#sync=" + encodeURIComponent(syncCode);
-}
-
-function updateSyncLinked() {
-  const linked = $("#sync-linked");
-  if (!linked) return;
-  const active = !!syncCode && syncConfigured();
-  linked.hidden = !active;
-  if (!active) return;
-  const qr = $("#sync-qr");
-  const val = $("#sync-code-value");
-  if (qr) qr.src = "https://api.qrserver.com/v1/create-qr-code/?size=180x180&margin=6&data=" + encodeURIComponent(syncLinkUrl());
-  if (val) val.textContent = syncCode;
+  // real time: any change on any device updates this wall instantly
+  syncRef.on("value", (snap) => {
+    const remote = snap.val();
+    if (remote && Array.isArray(remote.notes) && (Number(remote.updatedAt) || 0) > syncUpdatedAt()) {
+      applyRemote(remote);
+    } else if (!remote || !Array.isArray(remote.notes)) {
+      pushNow();
+    }
+  });
 }
 
 /* ---------- rendering ---------- */
@@ -1751,45 +1613,6 @@ document.addEventListener("keydown", (e) => {
   if (e.key !== "Escape") return;
   if (!addModal.hidden) closeAddModal();
   if (!notePopup.hidden) closePopup();
-  const syncModal = $("#sync-modal");
-  if (syncModal && !syncModal.hidden) syncModal.hidden = true;
-});
-
-/* ---------- sync UI ---------- */
-
-$("#sync-btn").addEventListener("click", () => {
-  const modal = $("#sync-modal");
-  const input = $("#sync-code-input");
-  if (modal) modal.hidden = false;
-  if (input) input.value = syncCode || "";
-  setSyncState(syncState);
-});
-
-document.querySelectorAll("[data-close-sync]").forEach((el) => {
-  el.addEventListener("click", () => { $("#sync-modal").hidden = true; });
-});
-
-$("#sync-generate").addEventListener("click", () => {
-  $("#sync-code-input").value = generateSyncCode();
-});
-
-$("#sync-connect").addEventListener("click", () => {
-  connectSync($("#sync-code-input").value);
-});
-
-$("#sync-disconnect").addEventListener("click", () => {
-  disconnectSync();
-});
-
-$("#sync-copy").addEventListener("click", async () => {
-  const btn = $("#sync-copy");
-  try {
-    await navigator.clipboard.writeText(syncCode);
-    btn.textContent = "copied \u2713";
-  } catch {
-    btn.textContent = "copy failed";
-  }
-  setTimeout(() => { btn.textContent = "copy"; }, 1500);
 });
 
 /* ---------- boot ---------- */
@@ -1798,15 +1621,4 @@ updateThemeBtn();
 buildTagTabs();
 buildProgressTabs();
 render();
-
-// link from a QR scan: opening the site with #sync=CODE adopts that wall
-if (syncConfigured()) {
-  const m = (location.hash || "").match(/[#&]sync=([\w-]+)/);
-  if (m) {
-    syncCode = m[1];
-    try { localStorage.setItem(SYNC_CODE_KEY, syncCode); } catch {}
-    try { history.replaceState(null, "", location.pathname + location.search); } catch {}
-  }
-}
-
 initSync();
