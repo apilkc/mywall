@@ -332,6 +332,25 @@ body {
 
 .pin-btn:hover { filter: brightness(1.14); }
 
+.sync-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: none;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 8px 14px;
+  cursor: pointer;
+  font-family: var(--sans);
+  font-size: 0.72rem;
+  color: var(--gray);
+  transition: color 0.15s ease, border-color 0.15s ease;
+}
+
+.sync-btn:hover { color: var(--cream); border-color: var(--line-strong); }
+.sync-btn[data-state="synced"] { color: var(--cream); border-color: rgba(106, 176, 76, 0.7); }
+.sync-btn[data-state="offline"] { color: #d98880; border-color: rgba(235, 77, 75, 0.55); }
+
 /* ---------- wall grid ---------- */
 
 .wall {
@@ -1029,6 +1048,61 @@ body.is-dragging { cursor: grabbing; }
 }
 
 .btn-text:hover { color: var(--cream); }
+
+/* ---------- sync modal ---------- */
+
+.sync-card {
+  max-width: 440px;
+}
+
+.sync-desc {
+  margin: 12px auto 0;
+  max-width: 360px;
+  text-align: center;
+  font-family: var(--sans);
+  font-size: 0.82rem;
+  line-height: 1.5;
+  color: var(--gray);
+}
+
+.sync-desc strong { color: var(--cream); }
+
+.sync-code-input {
+  text-align: center;
+  letter-spacing: 0.05em;
+}
+
+.sync-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 18px;
+}
+
+.sync-actions .btn-submit {
+  flex: 1;
+  margin-top: 0;
+  padding: 12px;
+  font-family: var(--sans);
+  font-size: 0.95rem;
+}
+
+.sync-status {
+  margin: 16px 0 0;
+  min-height: 1.4em;
+  text-align: center;
+  font-family: var(--sans);
+  font-size: 0.78rem;
+  line-height: 1.4;
+  color: var(--gray);
+}
+
+.sync-status.is-error { color: #d98880; }
+
+#sync-disconnect {
+  display: block;
+  margin: 14px auto 0;
+}
 
 /* ---------- note sizes (normal / double) ---------- */
 

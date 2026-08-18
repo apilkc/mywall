@@ -7,6 +7,8 @@
 const STORAGE_KEY = "research-wall-v1";
 const TAGS_KEY = "research-wall-tags-v1";
 const THEME_KEY = "research-wall-theme";
+const SYNC_CODE_KEY = "research-wall-sync-code";
+const SYNC_UPDATED_KEY = "research-wall-sync-updatedAt";
 const TRASH_DAYS = 30; // keep trashed notes at least this many days
 const DAY_MS = 86400000;
 
@@ -99,6 +101,10 @@ let selectedStyle = "blank";
 let openNoteId = null;
 let editingNoteId = null;
 let viewMode = "wall"; // "wall" | "trash"
+let syncCode = "";
+let syncState = "setup"; // setup | checking | syncing | synced | offline
+let syncPushTimer = null;
+let syncInFlight = false;
 
 /* ---------- elements ---------- */
 
@@ -585,6 +591,7 @@ function saveTags() {
   } catch {
     /* ignore */
   }
+  scheduleSync();
 }
 
 function ensureTagByLabel(label) {
@@ -656,6 +663,159 @@ function saveNotes() {
   } catch {
     /* ignore */
   }
+  scheduleSync();
+}
+
+/* ---------- cross-device sync (Firebase Realtime DB REST) ---------- */
+
+function syncConfigured() {
+  const cfg = window.SYNC_CONFIG || {};
+  const url = (cfg.databaseURL || "").trim();
+  return url.startsWith("https://") && !/YOUR_/i.test(url) && !/example/i.test(url);
+}
+
+function syncBaseUrl() {
+  return ((window.SYNC_CONFIG && window.SYNC_CONFIG.databaseURL) || "").replace(/\/+$/, "");
+}
+
+function syncWallUrl() {
+  return syncBaseUrl() + "/walls/" + encodeURIComponent(syncCode) + ".json";
+}
+
+function syncUpdatedAt() {
+  try { return Number(localStorage.getItem(SYNC_UPDATED_KEY)) || 0; } catch { return 0; }
+}
+
+function setSyncUpdatedAt(t) {
+  try { localStorage.setItem(SYNC_UPDATED_KEY, String(t)); } catch {}
+}
+
+function setSyncState(state) {
+  syncState = state;
+  const btn = $("#sync-btn");
+  if (!btn) return;
+  btn.dataset.state = state;
+  const labels = {
+    setup: "\u2601 sync",
+    checking: "\u2601 syncing\u2026",
+    syncing: "\u2601 syncing\u2026",
+    synced: "\u2601 synced",
+    offline: "\u2601 offline",
+  };
+  btn.textContent = labels[state] || labels.setup;
+  const status = $("#sync-status");
+  if (status) {
+    const msgs = {
+      setup: syncConfigured()
+        ? "Not connected. Enter a code to sync this wall across your devices."
+        : "Sync isn't set up yet. Paste your database URL into firebase-config.js first.",
+      checking: "Checking for your notes\u2026",
+      syncing: "Saving to the cloud\u2026",
+      synced: "Synced \u2713 \u2014 use the same code on your other devices.",
+      offline: "Couldn't reach the server. Notes are saved on this device only.",
+    };
+    status.textContent = msgs[state] || "";
+    status.classList.toggle("is-error", state === "offline");
+  }
+  const disc = $("#sync-disconnect");
+  if (disc) disc.hidden = !syncCode;
+}
+
+function syncPayload() {
+  return { notes: notes, tags: tags, updatedAt: syncUpdatedAt() };
+}
+
+async function syncPush() {
+  const res = await fetch(syncWallUrl(), {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(syncPayload()),
+  });
+  if (!res.ok) throw new Error("HTTP " + res.status);
+}
+
+async function syncPull() {
+  const res = await fetch(syncWallUrl());
+  if (!res.ok) throw new Error("HTTP " + res.status);
+  const data = await res.json();
+  return data && typeof data === "object" && Array.isArray(data.notes) ? data : null;
+}
+
+function scheduleSync() {
+  if (!syncConfigured() || !syncCode) return;
+  clearTimeout(syncPushTimer);
+  syncPushTimer = setTimeout(pushNow, 900);
+}
+
+async function pushNow() {
+  if (syncInFlight) return;
+  syncInFlight = true;
+  setSyncState("syncing");
+  setSyncUpdatedAt(Date.now());
+  try {
+    await syncPush();
+    setSyncState("synced");
+  } catch (err) {
+    setSyncState("offline");
+  } finally {
+    syncInFlight = false;
+  }
+}
+
+async function initSync() {
+  try { syncCode = localStorage.getItem(SYNC_CODE_KEY) || ""; } catch { syncCode = ""; }
+  if (!syncCode) { setSyncState("setup"); return; }
+  if (!syncConfigured()) { setSyncState("setup"); return; }
+
+  setSyncState("checking");
+  let remote = null;
+  try { remote = await syncPull(); } catch { remote = null; }
+
+  if (!remote) {
+    await pushNow();
+    return;
+  }
+
+  const remoteTs = Number(remote.updatedAt) || 0;
+  const localTs = syncUpdatedAt();
+
+  if (remoteTs > localTs && Array.isArray(remote.notes)) {
+    notes = remote.notes;
+    tags = Array.isArray(remote.tags) && remote.tags.length ? remote.tags : tags;
+    setSyncUpdatedAt(remoteTs);
+    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(notes)); } catch {}
+    try { localStorage.setItem(TAGS_KEY, JSON.stringify(tags)); } catch {}
+    activeTag = "all";
+    buildTagTabs();
+    render();
+    setSyncState("synced");
+  } else {
+    await pushNow();
+  }
+}
+
+function connectSync(code) {
+  const clean = (code || "").trim().toLowerCase().replace(/\s+/g, "-").replace(/-+/g, "-");
+  if (!clean) return;
+  syncCode = clean;
+  try { localStorage.setItem(SYNC_CODE_KEY, syncCode); } catch {}
+  const input = $("#sync-code-input");
+  if (input) input.value = syncCode;
+  initSync();
+}
+
+function disconnectSync() {
+  syncCode = "";
+  try { localStorage.removeItem(SYNC_CODE_KEY); } catch {}
+  const input = $("#sync-code-input");
+  if (input) input.value = "";
+  setSyncState("setup");
+}
+
+function generateSyncCode() {
+  const words = ["oak","river","amber","falcon","cedar","ember","maple","harbor","quartz","lumen","nimbus","petal","spruce","tide","willow","canyon","meadow","aspen","summit","briar"];
+  const pick = () => words[Math.floor(Math.random() * words.length)];
+  return pick() + "-" + pick() + "-" + Math.floor(10 + Math.random() * 90);
 }
 
 /* ---------- rendering ---------- */
@@ -1533,6 +1693,34 @@ document.addEventListener("keydown", (e) => {
   if (e.key !== "Escape") return;
   if (!addModal.hidden) closeAddModal();
   if (!notePopup.hidden) closePopup();
+  const syncModal = $("#sync-modal");
+  if (syncModal && !syncModal.hidden) syncModal.hidden = true;
+});
+
+/* ---------- sync UI ---------- */
+
+$("#sync-btn").addEventListener("click", () => {
+  const modal = $("#sync-modal");
+  const input = $("#sync-code-input");
+  if (modal) modal.hidden = false;
+  if (input) input.value = syncCode || "";
+  setSyncState(syncState);
+});
+
+document.querySelectorAll("[data-close-sync]").forEach((el) => {
+  el.addEventListener("click", () => { $("#sync-modal").hidden = true; });
+});
+
+$("#sync-generate").addEventListener("click", () => {
+  $("#sync-code-input").value = generateSyncCode();
+});
+
+$("#sync-connect").addEventListener("click", () => {
+  connectSync($("#sync-code-input").value);
+});
+
+$("#sync-disconnect").addEventListener("click", () => {
+  disconnectSync();
 });
 
 /* ---------- boot ---------- */
@@ -1541,3 +1729,4 @@ updateThemeBtn();
 buildTagTabs();
 buildProgressTabs();
 render();
+initSync();
