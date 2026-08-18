@@ -8,6 +8,7 @@ const STORAGE_KEY = "research-wall-v1";
 const TAGS_KEY = "research-wall-tags-v1";
 const THEME_KEY = "research-wall-theme";
 const SYNC_UPDATED_KEY = "research-wall-sync-updatedAt";
+const SYNC_DIRTY_KEY = "research-wall-sync-dirty";
 const TRASH_DAYS = 30; // keep trashed notes at least this many days
 const DAY_MS = 86400000;
 
@@ -590,6 +591,7 @@ function saveTags() {
   } catch {
     /* ignore */
   }
+  setSyncDirty(true);
   scheduleSync();
 }
 
@@ -662,6 +664,7 @@ function saveNotes() {
   } catch {
     /* ignore */
   }
+  setSyncDirty(true);
   scheduleSync();
 }
 
@@ -686,6 +689,24 @@ function setSyncUpdatedAt(t) {
   try { localStorage.setItem(SYNC_UPDATED_KEY, String(t)); } catch {}
 }
 
+// The server copy is the source of truth. We keep three local markers so we
+// can tell "our own write echoing back" apart from "another device changed":
+//   - lastAppliedAt: the updatedAt of the newest server state we've accepted
+//     (persisted, so a reload doesn't re-apply stale data)
+//   - pendingPushIds: pushIds we sent that haven't echoed back yet
+//   - dirty: whether we have local edits the server hasn't confirmed yet
+let lastAppliedAt = syncUpdatedAt();
+let lastPushId = null;
+const pendingPushIds = new Set();
+
+function syncDirty() {
+  try { return localStorage.getItem(SYNC_DIRTY_KEY) === "1"; } catch { return false; }
+}
+
+function setSyncDirty(d) {
+  try { localStorage.setItem(SYNC_DIRTY_KEY, d ? "1" : "0"); } catch {}
+}
+
 function scheduleSync() {
   if (!syncRef) return;
   clearTimeout(syncPushTimer);
@@ -695,17 +716,21 @@ function scheduleSync() {
 function pushNow() {
   if (!syncRef) return;
   const t = Date.now();
-  setSyncUpdatedAt(t);
-  syncRef.set({ notes: notes, tags: tags, updatedAt: t }).catch(() => {});
+  const pushId = makeId();
+  lastPushId = pushId;
+  pendingPushIds.add(pushId);
+  syncRef
+    .set({ notes: notes, tags: tags, updatedAt: t, pushId: pushId })
+    .catch((err) => {
+      pendingPushIds.delete(pushId);
+      console.warn("Sync push failed; will retry on the next change.", err);
+    });
 }
 
 function applyRemote(remote) {
   if (!remote || !Array.isArray(remote.notes)) return;
-  const remoteTs = Number(remote.updatedAt) || 0;
-  if (remoteTs <= syncUpdatedAt()) return;
   notes = remote.notes;
   tags = Array.isArray(remote.tags) && remote.tags.length ? remote.tags : tags;
-  setSyncUpdatedAt(remoteTs);
   try { localStorage.setItem(STORAGE_KEY, JSON.stringify(notes)); } catch {}
   try { localStorage.setItem(TAGS_KEY, JSON.stringify(tags)); } catch {}
   activeTag = "all";
@@ -730,9 +755,32 @@ function initSync() {
   // real time: any change on any device updates this wall instantly
   syncRef.on("value", (snap) => {
     const remote = snap.val();
-    if (remote && Array.isArray(remote.notes) && (Number(remote.updatedAt) || 0) > syncUpdatedAt()) {
+
+    // no wall on the server yet — seed it from whatever we have locally
+    if (!remote || !Array.isArray(remote.notes)) {
+      pushNow();
+      return;
+    }
+
+    const remoteTs = Number(remote.updatedAt) || 0;
+
+    // our own write echoed back: it's already on screen, just confirm it
+    if (remote.pushId && pendingPushIds.has(remote.pushId)) {
+      pendingPushIds.delete(remote.pushId);
+      lastAppliedAt = remoteTs;
+      setSyncUpdatedAt(remoteTs);
+      if (remote.pushId === lastPushId) setSyncDirty(false);
+      return;
+    }
+
+    if (remoteTs > lastAppliedAt) {
+      // another device changed the wall — adopt it
+      lastAppliedAt = remoteTs;
+      setSyncUpdatedAt(remoteTs);
+      setSyncDirty(false);
       applyRemote(remote);
-    } else if (!remote || !Array.isArray(remote.notes)) {
+    } else if (syncDirty() && remoteTs <= lastAppliedAt) {
+      // we have local edits the server doesn't know about — push them up
       pushNow();
     }
   });
