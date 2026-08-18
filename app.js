@@ -712,7 +712,7 @@ function setSyncState(state) {
         : "Sync isn't set up yet. Paste your database URL into firebase-config.js first.",
       checking: "Checking for your notes\u2026",
       syncing: "Saving to the cloud\u2026",
-      synced: "Synced \u2713 \u2014 use the same code on your other devices.",
+      synced: "Synced \u2713 \u2014 scan the code below on your other device to link it.",
       offline: "Couldn't reach the server. Notes are saved on this device only.",
     };
     status.textContent = msgs[state] || "";
@@ -765,8 +765,13 @@ async function pushNow() {
 
 async function initSync() {
   try { syncCode = localStorage.getItem(SYNC_CODE_KEY) || ""; } catch { syncCode = ""; }
-  if (!syncCode) { setSyncState("setup"); return; }
-  if (!syncConfigured()) { setSyncState("setup"); return; }
+  if (!syncConfigured()) { setSyncState("setup"); updateSyncLinked(); return; }
+  if (!syncCode) {
+    // automatic: this device gets its own private wall, no clicks needed
+    syncCode = generateSyncCode();
+    try { localStorage.setItem(SYNC_CODE_KEY, syncCode); } catch {}
+  }
+  updateSyncLinked();
 
   setSyncState("checking");
   let remote = null;
@@ -802,6 +807,7 @@ function connectSync(code) {
   try { localStorage.setItem(SYNC_CODE_KEY, syncCode); } catch {}
   const input = $("#sync-code-input");
   if (input) input.value = syncCode;
+  updateSyncLinked();
   initSync();
 }
 
@@ -810,6 +816,7 @@ function disconnectSync() {
   try { localStorage.removeItem(SYNC_CODE_KEY); } catch {}
   const input = $("#sync-code-input");
   if (input) input.value = "";
+  updateSyncLinked();
   setSyncState("setup");
 }
 
@@ -817,6 +824,22 @@ function generateSyncCode() {
   const words = ["oak","river","amber","falcon","cedar","ember","maple","harbor","quartz","lumen","nimbus","petal","spruce","tide","willow","canyon","meadow","aspen","summit","briar"];
   const pick = () => words[Math.floor(Math.random() * words.length)];
   return pick() + "-" + pick() + "-" + Math.floor(10 + Math.random() * 90);
+}
+
+function syncLinkUrl() {
+  return location.origin + location.pathname + "#sync=" + encodeURIComponent(syncCode);
+}
+
+function updateSyncLinked() {
+  const linked = $("#sync-linked");
+  if (!linked) return;
+  const active = !!syncCode && syncConfigured();
+  linked.hidden = !active;
+  if (!active) return;
+  const qr = $("#sync-qr");
+  const val = $("#sync-code-value");
+  if (qr) qr.src = "https://api.qrserver.com/v1/create-qr-code/?size=180x180&margin=6&data=" + encodeURIComponent(syncLinkUrl());
+  if (val) val.textContent = syncCode;
 }
 
 /* ---------- rendering ---------- */
@@ -1724,10 +1747,32 @@ $("#sync-disconnect").addEventListener("click", () => {
   disconnectSync();
 });
 
+$("#sync-copy").addEventListener("click", async () => {
+  const btn = $("#sync-copy");
+  try {
+    await navigator.clipboard.writeText(syncCode);
+    btn.textContent = "copied \u2713";
+  } catch {
+    btn.textContent = "copy failed";
+  }
+  setTimeout(() => { btn.textContent = "copy"; }, 1500);
+});
+
 /* ---------- boot ---------- */
 
 updateThemeBtn();
 buildTagTabs();
 buildProgressTabs();
 render();
+
+// link from a QR scan: opening the site with #sync=CODE adopts that wall
+if (syncConfigured()) {
+  const m = (location.hash || "").match(/[#&]sync=([\w-]+)/);
+  if (m) {
+    syncCode = m[1];
+    try { localStorage.setItem(SYNC_CODE_KEY, syncCode); } catch {}
+    try { history.replaceState(null, "", location.pathname + location.search); } catch {}
+  }
+}
+
 initSync();

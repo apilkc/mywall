@@ -1099,6 +1099,40 @@ body.is-dragging { cursor: grabbing; }
 
 .sync-status.is-error { color: #d98880; }
 
+.sync-linked {
+  margin-top: 18px;
+  text-align: center;
+}
+
+.sync-qr {
+  display: block;
+  width: 180px;
+  height: 180px;
+  margin: 14px auto 0;
+  background: #fff;
+  border-radius: 10px;
+  padding: 6px;
+}
+
+.sync-code-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.sync-code-value {
+  font-family: var(--sans);
+  font-size: 0.85rem;
+  letter-spacing: 0.04em;
+  color: var(--cream);
+  background: var(--input-bg);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 6px 12px;
+}
+
 #sync-disconnect {
   display: block;
   margin: 14px auto 0;
