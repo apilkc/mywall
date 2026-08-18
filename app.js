@@ -86,6 +86,11 @@ const NOTE_PROMPTS = [
 
 /* ---------- state ---------- */
 
+let syncCode = "";
+let syncState = "setup"; // setup | checking | syncing | synced | offline
+let syncPushTimer = null;
+let syncInFlight = false;
+
 let sortMode = "custom";
 let tags = loadTags();
 let notes = loadNotes();
@@ -101,10 +106,6 @@ let selectedStyle = "blank";
 let openNoteId = null;
 let editingNoteId = null;
 let viewMode = "wall"; // "wall" | "trash"
-let syncCode = "";
-let syncState = "setup"; // setup | checking | syncing | synced | offline
-let syncPushTimer = null;
-let syncInFlight = false;
 
 /* ---------- elements ---------- */
 
