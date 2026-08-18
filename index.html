@@ -17,7 +17,7 @@
     href="https://fonts.googleapis.com/css2?family=Lato:wght@300;400;700&display=swap"
     rel="stylesheet"
   />
-  <link rel="stylesheet" href="styles.css?v=11" />
+  <link rel="stylesheet" href="styles.css?v=13" />
 </head>
 <body>
   <!-- ============ WALL VIEW ============ -->
@@ -26,7 +26,7 @@
       <div class="topbar-main">
         <div class="topbar-left">
           <h1 class="brand" tabindex="0" role="button" aria-label="My research space — go to the home wall" title="go to the home wall">My research space</h1>
-          <p class="counter"><span id="note-count">0</span> NOTES PINNED <span class="version-badge" id="version-badge" title="deployed version">v12</span></p>
+          <p class="counter"><span id="note-count">0</span> NOTES PINNED <span class="version-badge" id="version-badge" title="deployed version">v13</span></p>
         </div>
         <div class="topbar-right">
           <div class="sort-row" role="group" aria-label="Sort the wall">
@@ -199,11 +199,12 @@
         </div>
       </div>
       <p class="sync-status" id="sync-status"></p>
+      <p class="sync-last" id="sync-last" hidden></p>
       <button id="sync-disconnect" class="btn-text" type="button" hidden>disconnect this device</button>
     </div>
   </div>
 
   <script src="firebase-config.js?v=12"></script>
-  <script src="app.js?v=11"></script>
+  <script src="app.js?v=13"></script>
 </body>
 </html>

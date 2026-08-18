@@ -9,6 +9,7 @@ const TAGS_KEY = "research-wall-tags-v1";
 const THEME_KEY = "research-wall-theme";
 const SYNC_CODE_KEY = "research-wall-sync-code";
 const SYNC_UPDATED_KEY = "research-wall-sync-updatedAt";
+const LAST_SYNC_KEY = "research-wall-last-sync";
 const TRASH_DAYS = 30; // keep trashed notes at least this many days
 const DAY_MS = 86400000;
 
@@ -691,6 +692,24 @@ function setSyncUpdatedAt(t) {
   try { localStorage.setItem(SYNC_UPDATED_KEY, String(t)); } catch {}
 }
 
+function lastSyncAt() {
+  try { return Number(localStorage.getItem(LAST_SYNC_KEY)) || 0; } catch { return 0; }
+}
+
+function setLastSyncAt(t) {
+  try { localStorage.setItem(LAST_SYNC_KEY, String(t)); } catch {}
+}
+
+function formatSyncTime(t) {
+  if (!t) return "";
+  const diff = Date.now() - t;
+  if (diff < 60000) return "just now";
+  if (diff < 3600000) return Math.floor(diff / 60000) + " min ago";
+  if (diff < 86400000) return Math.floor(diff / 3600000) + " hr ago";
+  const d = new Date(t);
+  return d.toLocaleDateString([], { month: "short", day: "numeric" }) + " at " + d.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+}
+
 function setSyncState(state) {
   syncState = state;
   const btn = $("#sync-btn");
@@ -720,6 +739,19 @@ function setSyncState(state) {
   }
   const disc = $("#sync-disconnect");
   if (disc) disc.hidden = !syncCode;
+  updateSyncLast();
+}
+
+function updateSyncLast() {
+  const el = $("#sync-last");
+  if (!el) return;
+  const t = lastSyncAt();
+  if (t) {
+    el.hidden = false;
+    el.textContent = "cloud last updated: " + formatSyncTime(t);
+  } else {
+    el.hidden = true;
+  }
 }
 
 function syncPayload() {
@@ -755,6 +787,7 @@ async function pushNow() {
   setSyncUpdatedAt(Date.now());
   try {
     await syncPush();
+    setLastSyncAt(Date.now());
     setSyncState("synced");
   } catch (err) {
     setSyncState("offline");
@@ -794,6 +827,7 @@ async function initSync() {
     activeTag = "all";
     buildTagTabs();
     render();
+    setLastSyncAt(remoteTs);
     setSyncState("synced");
   } else {
     await pushNow();
